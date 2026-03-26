@@ -4,6 +4,7 @@ import {
   createChecklistItems,
 } from '../data/checklistTemplate'
 import {
+  deleteChecklistItem,
   fetchChecklistItems,
   isFirebaseConfigured,
   saveChecklistItem,
@@ -129,6 +130,44 @@ export function useChecklistStore() {
     )
   }, [])
 
+  // Add new item to a section
+  const addItem = useCallback((sectionId, pointText) => {
+    const section = SECTION_LOOKUP[sectionId]
+    if (!section || !pointText.trim()) return null
+
+    const sectionItems = items.filter((i) => i.sectionId === sectionId)
+    const nextNumber = String(sectionItems.length + 1)
+    const newId = `${sectionId}-${Date.now()}`
+
+    const newItem = {
+      id: newId,
+      sectionId,
+      sectionTitle: section.title,
+      number: nextNumber,
+      point: pointText.trim(),
+      status: 'pending',
+      comment: '',
+      actionPlan: '',
+      lastUpdated: Date.now(),
+    }
+
+    setItems((cur) => [...cur, newItem])
+    return newItem
+  }, [items])
+
+  // Delete item
+  const deleteItem = useCallback(async (itemId) => {
+    setItems((cur) => cur.filter((item) => item.id !== itemId))
+
+    if (FIREBASE_READY) {
+      try {
+        await deleteChecklistItem(itemId)
+      } catch (err) {
+        console.error('Firebase delete failed:', err)
+      }
+    }
+  }, [])
+
   // Computed values
   const statusCounts = useMemo(
     () =>
@@ -225,6 +264,8 @@ export function useChecklistStore() {
     recentActivity,
     focusItems,
     handleItemChange,
+    addItem,
+    deleteItem,
     handleSync,
     loadRemoteItems,
     STATUS_OPTIONS,

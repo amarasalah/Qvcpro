@@ -1,6 +1,7 @@
 import { initializeApp } from 'firebase/app'
 import {
   collection,
+  deleteDoc,
   doc,
   getDocs,
   getFirestore,
@@ -127,6 +128,16 @@ export async function syncChecklistItems(items, sectionIndexLookup) {
   })
 
   await batch.commit()
+
+  return true
+}
+
+export async function deleteChecklistItem(itemId) {
+  if (!firestore) {
+    return false
+  }
+
+  await deleteDoc(doc(firestore, collectionName, itemId))
 
   return true
 }

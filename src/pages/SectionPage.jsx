@@ -2,10 +2,15 @@ import { useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   CheckCircle2,
+  Edit3,
   Factory,
+  Plus,
+  Save,
   Search,
   Shield,
   TestTube,
+  Trash2,
+  X,
 } from 'lucide-react'
 
 const SECTION_ICONS = {
@@ -23,9 +28,20 @@ function formatDateTime(value) {
 }
 
 export default function SectionPage({ section, store }) {
-  const { items, handleItemChange, STATUS_OPTIONS, STATUS_META } = store
+  const { items, handleItemChange, addItem, deleteItem, STATUS_OPTIONS, STATUS_META } = store
   const [statusFilter, setStatusFilter] = useState('all')
   const [localSearch, setLocalSearch] = useState('')
+
+  // Create new task state
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [newPointText, setNewPointText] = useState('')
+
+  // Inline edit state
+  const [editingId, setEditingId] = useState(null)
+  const [editText, setEditText] = useState('')
+
+  // Delete confirm state
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null)
 
   const sectionItems = useMemo(
     () => items.filter((i) => i.sectionId === section.id),
@@ -45,7 +61,7 @@ export default function SectionPage({ section, store }) {
   )
 
   const done = counts.conforming + counts.nonConforming
-  const progress = Math.round((done / sectionItems.length) * 100)
+  const progress = sectionItems.length ? Math.round((done / sectionItems.length) * 100) : 0
 
   const query = localSearch.trim().toLowerCase()
 
@@ -66,6 +82,37 @@ export default function SectionPage({ section, store }) {
 
   const Icon = SECTION_ICONS[section.id] || CheckCircle2
 
+  // Handlers
+  const handleAddTask = () => {
+    if (!newPointText.trim()) return
+    addItem(section.id, newPointText)
+    setNewPointText('')
+    setShowAddForm(false)
+  }
+
+  const handleStartEdit = (item) => {
+    setEditingId(item.id)
+    setEditText(item.point)
+  }
+
+  const handleSaveEdit = (itemId) => {
+    if (editText.trim()) {
+      handleItemChange(itemId, 'point', editText.trim())
+    }
+    setEditingId(null)
+    setEditText('')
+  }
+
+  const handleCancelEdit = () => {
+    setEditingId(null)
+    setEditText('')
+  }
+
+  const handleConfirmDelete = async (itemId) => {
+    await deleteItem(itemId)
+    setConfirmDeleteId(null)
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
@@ -78,11 +125,83 @@ export default function SectionPage({ section, store }) {
         <div className="section-icon-box" style={{ background: `linear-gradient(135deg, ${section.accent}, ${section.accent}88)` }}>
           <Icon size={26} />
         </div>
-        <div>
+        <div style={{ flex: 1 }}>
           <h1>{section.title}</h1>
           <p>{section.description}</p>
         </div>
+        <button
+          className="primary-btn"
+          onClick={() => setShowAddForm(true)}
+          type="button"
+          style={{ fontSize: 12 }}
+        >
+          <Plus size={16} />
+          Nouveau contrôle
+        </button>
       </div>
+
+      {/* Add Task Form */}
+      <AnimatePresence>
+        {showAddForm && (
+          <motion.div
+            className="glass-card"
+            style={{ marginBottom: 20, position: 'relative', overflow: 'hidden' }}
+            initial={{ opacity: 0, height: 0, marginBottom: 0 }}
+            animate={{ opacity: 1, height: 'auto', marginBottom: 20 }}
+            exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+            transition={{ duration: 0.25 }}
+          >
+            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg, ${section.accent}, ${section.accent}66)`, borderRadius: '16px 16px 0 0' }} />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <h3 style={{ fontSize: 15, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Plus size={16} style={{ color: section.accent }} />
+                Ajouter un point de contrôle
+              </h3>
+              <button
+                onClick={() => { setShowAddForm(false); setNewPointText('') }}
+                type="button"
+                style={{ background: 'rgba(148,163,184,0.08)', border: '1px solid rgba(148,163,184,0.1)', borderRadius: 8, color: '#94a3b8', width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+              >
+                <X size={14} />
+              </button>
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <input
+                type="text"
+                placeholder="Décrivez le nouveau point de contrôle..."
+                value={newPointText}
+                onChange={(e) => setNewPointText(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleAddTask()}
+                autoFocus
+                style={{
+                  flex: 1,
+                  background: 'rgba(148,163,184,0.06)',
+                  border: '1px solid rgba(148,163,184,0.1)',
+                  borderRadius: 10,
+                  color: '#f1f5f9',
+                  fontSize: 13,
+                  padding: '12px 16px',
+                  outline: 'none',
+                  fontFamily: 'inherit',
+                  transition: 'border-color 0.2s',
+                }}
+                onFocus={(e) => (e.target.style.borderColor = `${section.accent}55`)}
+                onBlur={(e) => (e.target.style.borderColor = 'rgba(148,163,184,0.1)')}
+              />
+              <button
+                className="primary-btn"
+                onClick={handleAddTask}
+                disabled={!newPointText.trim()}
+                type="button"
+                style={{ fontSize: 12, whiteSpace: 'nowrap' }}
+              >
+                <Plus size={14} />
+                Ajouter
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Progress */}
       <div className="section-progress-bar">
@@ -158,6 +277,9 @@ export default function SectionPage({ section, store }) {
         <AnimatePresence mode="popLayout">
           {filtered.map((item, index) => {
             const status = STATUS_META[item.status]
+            const isEditing = editingId === item.id
+            const isDeleting = confirmDeleteId === item.id
+
             return (
               <motion.article
                 className={`checklist-card status-${item.status}`}
@@ -165,7 +287,7 @@ export default function SectionPage({ section, store }) {
                 layout
                 initial={{ opacity: 0, y: 18 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -12 }}
+                exit={{ opacity: 0, scale: 0.9, y: -12 }}
                 transition={{ duration: 0.22, delay: Math.min(index * 0.03, 0.15) }}
               >
                 <div className="card-top">
@@ -174,15 +296,177 @@ export default function SectionPage({ section, store }) {
                     {section.title}
                     <strong>#{item.number}</strong>
                   </div>
-                  <div className="card-status-wrap">
-                    <span className="status-tag" style={{ color: status.color, borderColor: `${status.color}44` }}>
-                      {status.label}
-                    </span>
-                    <span className="timestamp">{formatDateTime(item.lastUpdated)}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <div className="card-status-wrap">
+                      <span className="status-tag" style={{ color: status.color, borderColor: `${status.color}44` }}>
+                        {status.label}
+                      </span>
+                      <span className="timestamp">{formatDateTime(item.lastUpdated)}</span>
+                    </div>
+                    {/* Edit & Delete buttons */}
+                    <div style={{ display: 'flex', gap: 4, marginLeft: 4 }}>
+                      {!isEditing && (
+                        <button
+                          onClick={() => handleStartEdit(item)}
+                          type="button"
+                          title="Modifier le point"
+                          style={{
+                            background: 'rgba(56,189,248,0.08)',
+                            border: '1px solid rgba(56,189,248,0.15)',
+                            borderRadius: 7,
+                            color: '#38bdf8',
+                            width: 28, height: 28,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                          }}
+                        >
+                          <Edit3 size={12} />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => setConfirmDeleteId(isDeleting ? null : item.id)}
+                        type="button"
+                        title="Supprimer"
+                        style={{
+                          background: isDeleting ? 'rgba(239,68,68,0.15)' : 'rgba(239,68,68,0.06)',
+                          border: `1px solid ${isDeleting ? 'rgba(239,68,68,0.3)' : 'rgba(239,68,68,0.12)'}`,
+                          borderRadius: 7,
+                          color: '#ef4444',
+                          width: 28, height: 28,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s',
+                        }}
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
                   </div>
                 </div>
 
-                <h3>{item.point}</h3>
+                {/* Delete confirmation */}
+                <AnimatePresence>
+                  {isDeleting && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.2 }}
+                      style={{
+                        background: 'rgba(239,68,68,0.06)',
+                        border: '1px solid rgba(239,68,68,0.15)',
+                        borderRadius: 10,
+                        padding: '10px 14px',
+                        marginBottom: 10,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 10,
+                      }}
+                    >
+                      <span style={{ fontSize: 12, color: '#fca5a5' }}>
+                        Supprimer ce contrôle définitivement ?
+                      </span>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button
+                          onClick={() => handleConfirmDelete(item.id)}
+                          type="button"
+                          style={{
+                            background: 'rgba(239,68,68,0.15)',
+                            border: '1px solid rgba(239,68,68,0.3)',
+                            borderRadius: 7,
+                            color: '#ef4444',
+                            fontSize: 11,
+                            fontWeight: 700,
+                            padding: '5px 12px',
+                            cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', gap: 4,
+                          }}
+                        >
+                          <Trash2 size={11} />
+                          Oui, supprimer
+                        </button>
+                        <button
+                          onClick={() => setConfirmDeleteId(null)}
+                          type="button"
+                          style={{
+                            background: 'rgba(148,163,184,0.08)',
+                            border: '1px solid rgba(148,163,184,0.1)',
+                            borderRadius: 7,
+                            color: '#94a3b8',
+                            fontSize: 11,
+                            fontWeight: 600,
+                            padding: '5px 12px',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Annuler
+                        </button>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* Editable title */}
+                {isEditing ? (
+                  <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+                    <input
+                      type="text"
+                      value={editText}
+                      onChange={(e) => setEditText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleSaveEdit(item.id)
+                        if (e.key === 'Escape') handleCancelEdit()
+                      }}
+                      autoFocus
+                      style={{
+                        flex: 1,
+                        background: 'rgba(56,189,248,0.06)',
+                        border: '1px solid rgba(56,189,248,0.2)',
+                        borderRadius: 8,
+                        color: '#f1f5f9',
+                        fontSize: 14,
+                        fontWeight: 600,
+                        padding: '8px 12px',
+                        outline: 'none',
+                        fontFamily: 'inherit',
+                      }}
+                    />
+                    <button
+                      onClick={() => handleSaveEdit(item.id)}
+                      type="button"
+                      style={{
+                        background: 'rgba(34,197,94,0.1)',
+                        border: '1px solid rgba(34,197,94,0.25)',
+                        borderRadius: 8,
+                        color: '#22c55e',
+                        width: 34, height: 34,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <Save size={14} />
+                    </button>
+                    <button
+                      onClick={handleCancelEdit}
+                      type="button"
+                      style={{
+                        background: 'rgba(148,163,184,0.08)',
+                        border: '1px solid rgba(148,163,184,0.1)',
+                        borderRadius: 8,
+                        color: '#94a3b8',
+                        width: 34, height: 34,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ) : (
+                  <h3>{item.point}</h3>
+                )}
 
                 <div className="status-switch">
                   {STATUS_OPTIONS.map((opt) => (
@@ -228,7 +512,7 @@ export default function SectionPage({ section, store }) {
           >
             <Search size={22} />
             <strong>Aucun contrôle trouvé.</strong>
-            <span>Essayez un autre filtre ou mot-clé.</span>
+            <span>Essayez un autre filtre ou ajoutez un nouveau point.</span>
           </motion.div>
         )}
       </div>

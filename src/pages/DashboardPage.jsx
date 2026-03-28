@@ -3,7 +3,10 @@ import {
   Activity,
   AlertTriangle,
   BarChart3,
+  Calendar,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Clock3,
   Database,
   FileSpreadsheet,
@@ -56,6 +59,10 @@ const tooltipStyle = {
 export default function DashboardPage({ store }) {
   const {
     items,
+    currentDate,
+    isToday,
+    switchDate,
+    availableDates,
     statusCounts,
     sectionChartData,
     statusChartData,
@@ -68,6 +75,20 @@ export default function DashboardPage({ store }) {
     SECTION_LOOKUP,
     recentActivity,
   } = store
+
+  const goToPrevDay = () => {
+    const d = new Date(currentDate)
+    d.setDate(d.getDate() - 1)
+    switchDate(d.toISOString().slice(0, 10))
+  }
+  const goToNextDay = () => {
+    const d = new Date(currentDate)
+    d.setDate(d.getDate() + 1)
+    const tomorrow = new Date()
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    if (d < tomorrow) switchDate(d.toISOString().slice(0, 10))
+  }
+  const goToToday = () => switchDate(new Date().toISOString().slice(0, 10))
 
   // Line chart data — conformity rate per section
   const lineChartData = CHECKLIST_SECTIONS.map((section) => {
@@ -104,8 +125,8 @@ export default function DashboardPage({ store }) {
 
   const completionCount = statusCounts.conforming + statusCounts.nonConforming
   const completionRate = Math.round((completionCount / items.length) * 100)
-  const commentCount = items.filter((i) => i.comment.trim()).length
-  const actionCount = items.filter((i) => i.actionPlan.trim()).length
+  const commentCount = items.filter((i) => i.comment?.trim()).length
+  const actionCount = items.filter((i) => i.actionPlan?.trim()).length
 
   const radialData = CHECKLIST_SECTIONS.map((section) => {
     const sItems = items.filter((i) => i.sectionId === section.id)
@@ -164,25 +185,55 @@ export default function DashboardPage({ store }) {
         transition={{ duration: 0.5 }}
       >
         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: 'linear-gradient(90deg, #38bdf8, #a78bfa, #f97316)', borderRadius: '16px 16px 0 0' }} />
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#38bdf8', fontWeight: 600, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>
-          <Sparkles size={14} />
-          Plateforme qualité béton précontraint
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 14, marginBottom: 14 }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#38bdf8', fontWeight: 600, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>
+              <Sparkles size={14} />
+              Plateforme qualité béton précontraint
+            </div>
+            <h1 style={{ fontSize: 22, fontWeight: 800, marginBottom: 4, lineHeight: 1.3 }}>
+              Checklist Qualité Quotidienne
+            </h1>
+            <p style={{ color: '#64748b', fontSize: 13 }}>
+              <strong style={{ color: '#38bdf8' }}>Production</strong> · <strong style={{ color: '#a78bfa' }}>Assurance</strong> · <strong style={{ color: '#f97316' }}>Contrôle</strong> — synchronisé avec Firebase
+            </p>
+          </div>
+
+          {/* DATE PICKER */}
+          <div className="glass-card" style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10, margin: 0 }}>
+            <button onClick={goToPrevDay} type="button" style={{ background: 'rgba(148,163,184,0.08)', border: '1px solid rgba(148,163,184,0.1)', borderRadius: 7, color: '#94a3b8', width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+              <ChevronLeft size={14} />
+            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Calendar size={16} style={{ color: '#38bdf8' }} />
+              <input
+                type="date"
+                value={currentDate}
+                onChange={(e) => switchDate(e.target.value)}
+                max={new Date().toISOString().slice(0, 10)}
+                style={{ background: 'transparent', border: 'none', color: '#f1f5f9', fontSize: 14, fontWeight: 700, fontFamily: 'inherit', outline: 'none', cursor: 'pointer' }}
+              />
+              {isToday && (
+                <span style={{ fontSize: 9, fontWeight: 700, color: '#22c55e', background: 'rgba(34,197,94,0.1)', padding: '2px 8px', borderRadius: 6, textTransform: 'uppercase' }}>Aujourd'hui</span>
+              )}
+              {!isToday && (
+                <span style={{ fontSize: 9, fontWeight: 700, color: '#f97316', background: 'rgba(249,115,22,0.1)', padding: '2px 8px', borderRadius: 6, textTransform: 'uppercase' }}>Archivé</span>
+              )}
+            </div>
+            <button onClick={goToNextDay} type="button" disabled={isToday} style={{ background: 'rgba(148,163,184,0.08)', border: '1px solid rgba(148,163,184,0.1)', borderRadius: 7, color: isToday ? '#334155' : '#94a3b8', width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: isToday ? 'not-allowed' : 'pointer' }}>
+              <ChevronRight size={14} />
+            </button>
+            {!isToday && (
+              <button onClick={goToToday} type="button" className="primary-btn" style={{ fontSize: 10, padding: '6px 12px' }}>
+                Aujourd'hui
+              </button>
+            )}
+          </div>
         </div>
-        <h1 style={{ fontSize: 22, fontWeight: 800, marginBottom: 8, lineHeight: 1.3 }}>
-          Le fichier Excel devient un cockpit qualité animé et exploitable.
-        </h1>
-        <p style={{ color: '#64748b', fontSize: 13, lineHeight: 1.6, maxWidth: 600, marginBottom: 16 }}>
-          Les feuilles <strong style={{ color: '#38bdf8' }}>Production</strong>,{' '}
-          <strong style={{ color: '#a78bfa' }}>Assurance Qualité</strong> et{' '}
-          <strong style={{ color: '#f97316' }}>Contrôle Qualité</strong> ont été normalisées en checklist dynamique
-          avec tableaux de bord et synchronisation Firebase.
-        </p>
+
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 600, padding: '5px 12px', borderRadius: 8, background: 'rgba(148,163,184,0.08)', border: '1px solid rgba(148,163,184,0.1)', color: '#94a3b8' }}>
-            <FileSpreadsheet size={12} /> {WORKBOOK_SUMMARY.fileName}
-          </span>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 600, padding: '5px 12px', borderRadius: 8, background: 'rgba(148,163,184,0.08)', border: '1px solid rgba(148,163,184,0.1)', color: '#94a3b8' }}>
-            <BarChart3 size={12} /> {WORKBOOK_SUMMARY.totalControls} contrôles
+            <FileSpreadsheet size={12} /> {items.length} contrôles
           </span>
           <span style={{
             display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 600, padding: '5px 12px', borderRadius: 8,

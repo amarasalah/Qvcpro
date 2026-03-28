@@ -4,15 +4,20 @@ import {
   createChecklistItems,
 } from '../data/checklistTemplate'
 import {
-  deleteChecklistItem,
-  fetchChecklistItems,
+  deleteDailyItem,
+  fetchDailyItems,
   isFirebaseConfigured,
-  saveChecklistItem,
-  syncChecklistItems,
+  saveDailyItem,
+  saveDailyMeta,
+  syncDailyItems,
+  listChecklistDates,
 } from '../lib/firebase'
 
-const STORAGE_KEY = 'qvc-quality-platform-state-v2'
 const FIREBASE_READY = isFirebaseConfigured()
+
+function todayStr() {
+  return new Date().toISOString().slice(0, 10) // YYYY-MM-DD
+}
 
 const STATUS_OPTIONS = [
   { value: 'conforming', label: 'Conforme', shortLabel: 'C', color: '#22c55e', bg: 'rgba(34,197,94,0.12)' },
@@ -34,29 +39,11 @@ const SECTION_LOOKUP = CHECKLIST_SECTIONS.reduce((m, s) => {
   return m
 }, {})
 
-function loadLocal() {
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY)
-    if (!raw) return []
-    const parsed = JSON.parse(raw)
-    return Array.isArray(parsed) ? parsed : []
-  } catch {
-    return []
-  }
-}
-
-function mergeItems(base, incoming) {
-  const map = new Map((incoming || []).map((item) => [item.id, item]))
-  return base.map((item) =>
-    map.has(item.id) ? { ...item, ...map.get(item.id) } : item,
-  )
-}
-
 export function useChecklistStore() {
-  const [items, setItems] = useState(() =>
-    mergeItems(createChecklistItems(), loadLocal()),
-  )
+  const [currentDate, setCurrentDate] = useState(todayStr())
+  const [items, setItems] = useState(() => createChecklistItems())
   const [searchQuery, setSearchQuery] = useState('')
+  const [availableDates, setAvailableDates] = useState([])
   const [firebaseState, setFirebaseState] = useState({
     loading: false,
     syncing: false,
@@ -65,18 +52,27 @@ export function useChecklistStore() {
     remoteCount: 0,
   })
 
-  // Persist to localStorage
-  useEffect(() => {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(items))
-  }, [items])
+  const isToday = currentDate === todayStr()
 
-  // Load from Firebase on mount
-  const loadRemoteItems = useCallback(async () => {
+  // Load daily checklist from Firebase
+  const loadDailyItems = useCallback(async (date) => {
     if (!FIREBASE_READY) return
     setFirebaseState((s) => ({ ...s, loading: true, error: '' }))
     try {
-      const remote = await fetchChecklistItems()
-      setItems((cur) => (remote.length ? mergeItems(cur, remote) : cur))
+      const remote = await fetchDailyItems(date)
+      if (remote.length > 0) {
+        // Merge with template to pick up any new template items
+        const template = createChecklistItems()
+        const remoteMap = new Map(remote.map((i) => [i.id, i]))
+        const merged = template.map((t) => remoteMap.has(t.id) ? { ...t, ...remoteMap.get(t.id) } : t)
+        // Also include any custom items not in template
+        const templateIds = new Set(template.map((t) => t.id))
+        const extras = remote.filter((r) => !templateIds.has(r.id))
+        setItems([...merged, ...extras])
+      } else {
+        // No data for this date — create fresh from template
+        setItems(createChecklistItems())
+      }
       setFirebaseState((s) => ({
         ...s,
         loading: false,
@@ -87,28 +83,47 @@ export function useChecklistStore() {
       setFirebaseState((s) => ({
         ...s,
         loading: false,
-        error: err?.message || 'Erreur de chargement Firebase.',
+        error: err?.message || 'Erreur de chargement.',
       }))
     }
   }, [])
 
-  useEffect(() => {
-    if (FIREBASE_READY) loadRemoteItems()
-  }, [loadRemoteItems])
+  // Load available dates
+  const loadDates = useCallback(async () => {
+    if (!FIREBASE_READY) return
+    try {
+      const dates = await listChecklistDates()
+      setAvailableDates(dates)
+    } catch { /* ignore */ }
+  }, [])
 
-  // Sync all to Firebase
+  // Load on mount and when date changes
+  useEffect(() => {
+    if (FIREBASE_READY) {
+      loadDailyItems(currentDate)
+      loadDates()
+    }
+  }, [currentDate, loadDailyItems, loadDates])
+
+  // Sync all items to Firebase for current date
   const handleSync = useCallback(async () => {
     if (!FIREBASE_READY) {
       setFirebaseState((s) => ({
         ...s,
-        error: 'Ajoutez vos variables VITE_FIREBASE_* pour activer la synchronisation.',
+        error: 'Firebase non configuré.',
       }))
       return
     }
     setFirebaseState((s) => ({ ...s, syncing: true, error: '' }))
     try {
-      await syncChecklistItems(items, SECTION_INDEX_LOOKUP)
-      await loadRemoteItems()
+      await syncDailyItems(currentDate, items, SECTION_INDEX_LOOKUP)
+      await saveDailyMeta(currentDate, {
+        date: currentDate,
+        totalItems: items.length,
+        createdAt: new Date().toISOString(),
+      })
+      await loadDailyItems(currentDate)
+      await loadDates()
       setFirebaseState((s) => ({ ...s, syncing: false, syncedAt: Date.now() }))
     } catch (err) {
       setFirebaseState((s) => ({
@@ -117,7 +132,11 @@ export function useChecklistStore() {
         error: err?.message || 'Échec de la synchronisation.',
       }))
     }
-  }, [items, loadRemoteItems])
+  }, [items, currentDate, loadDailyItems, loadDates])
+
+  const loadRemoteItems = useCallback(async () => {
+    await loadDailyItems(currentDate)
+  }, [currentDate, loadDailyItems])
 
   // Update single item
   const handleItemChange = useCallback((itemId, field, value) => {
@@ -130,7 +149,7 @@ export function useChecklistStore() {
     )
   }, [])
 
-  // Add new item to a section
+  // Add new item
   const addItem = useCallback((sectionId, pointText) => {
     const section = SECTION_LOOKUP[sectionId]
     if (!section || !pointText.trim()) return null
@@ -148,6 +167,7 @@ export function useChecklistStore() {
       status: 'pending',
       comment: '',
       actionPlan: '',
+      images: [],
       lastUpdated: Date.now(),
     }
 
@@ -158,14 +178,35 @@ export function useChecklistStore() {
   // Delete item
   const deleteItem = useCallback(async (itemId) => {
     setItems((cur) => cur.filter((item) => item.id !== itemId))
-
     if (FIREBASE_READY) {
-      try {
-        await deleteChecklistItem(itemId)
-      } catch (err) {
-        console.error('Firebase delete failed:', err)
-      }
+      try { await deleteDailyItem(currentDate, itemId) } catch { /* ignore */ }
     }
+  }, [currentDate])
+
+  // Image operations
+  const addImage = useCallback((itemId, imageData) => {
+    setItems((cur) =>
+      cur.map((item) =>
+        item.id === itemId
+          ? { ...item, images: [...(item.images || []), imageData], lastUpdated: Date.now() }
+          : item,
+      ),
+    )
+  }, [])
+
+  const removeImage = useCallback((itemId, publicId) => {
+    setItems((cur) =>
+      cur.map((item) =>
+        item.id === itemId
+          ? { ...item, images: (item.images || []).filter((img) => img.publicId !== publicId), lastUpdated: Date.now() }
+          : item,
+      ),
+    )
+  }, [])
+
+  // Change date
+  const switchDate = useCallback((newDate) => {
+    setCurrentDate(newDate)
   }, [])
 
   // Computed values
@@ -187,7 +228,7 @@ export function useChecklistStore() {
     () =>
       items.filter((item) => {
         if (!normalizedQuery) return true
-        return [item.sectionTitle, item.number, item.point, STATUS_META[item.status].label, item.comment, item.actionPlan]
+        return [item.sectionTitle, item.number, item.point, STATUS_META[item.status]?.label, item.comment, item.actionPlan]
           .filter(Boolean)
           .join(' ')
           .toLowerCase()
@@ -239,11 +280,11 @@ export function useChecklistStore() {
           (i) =>
             i.status === 'nonConforming' ||
             i.status === 'pending' ||
-            i.actionPlan.trim(),
+            (i.actionPlan && i.actionPlan.trim()),
         )
         .sort((a, b) => {
-          const pa = a.status === 'nonConforming' ? 0 : a.actionPlan.trim() ? 1 : a.status === 'pending' ? 2 : 3
-          const pb = b.status === 'nonConforming' ? 0 : b.actionPlan.trim() ? 1 : b.status === 'pending' ? 2 : 3
+          const pa = a.status === 'nonConforming' ? 0 : (a.actionPlan && a.actionPlan.trim()) ? 1 : a.status === 'pending' ? 2 : 3
+          const pb = b.status === 'nonConforming' ? 0 : (b.actionPlan && b.actionPlan.trim()) ? 1 : b.status === 'pending' ? 2 : 3
           if (pa !== pb) return pa - pb
           return (b.lastUpdated || 0) - (a.lastUpdated || 0)
         })
@@ -253,6 +294,10 @@ export function useChecklistStore() {
 
   return {
     items,
+    currentDate,
+    isToday,
+    availableDates,
+    switchDate,
     searchQuery,
     setSearchQuery,
     firebaseState,
@@ -266,6 +311,8 @@ export function useChecklistStore() {
     handleItemChange,
     addItem,
     deleteItem,
+    addImage,
+    removeImage,
     handleSync,
     loadRemoteItems,
     STATUS_OPTIONS,

@@ -70,7 +70,7 @@ export default function LoginPage() {
           <div className="login-logo-icon">
             <CheckCircle2 size={28} />
           </div>
-          <h1>QVC</h1>
+          <h1>iAuditor</h1>
           <p>Plateforme Qualité Béton Précontraint</p>
         </motion.div>
 

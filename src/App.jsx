@@ -133,7 +133,7 @@ export default function App() {
                   <CheckCircle2 size={20} />
                 </div>
                 <div className="brand-text">
-                  <span className="brand-title">QVC</span>
+                  <span className="brand-title">iAuditor</span>
                   <span className="brand-sub">Qualité Béton</span>
                 </div>
               </motion.div>

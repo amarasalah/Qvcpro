@@ -18,6 +18,7 @@ import {
   ZoomIn,
 } from 'lucide-react'
 import { uploadImage, isCloudinaryConfigured } from '../lib/cloudinary'
+import PrintButton from '../components/PrintButton'
 
 const SECTION_ICONS = {
   production: Factory,
@@ -153,6 +154,11 @@ export default function SectionPage({ section, store }) {
       exit={{ opacity: 0, y: -12 }}
       transition={{ duration: 0.35 }}
     >
+      <div className="print-header">
+        <h1>{section.title} — Checklist Qualité Béton Précontraint</h1>
+        <p>Imprimé le {new Intl.DateTimeFormat('fr-FR', { dateStyle: 'long', timeStyle: 'short' }).format(new Date())} — {sectionItems.length} points — Couverture {progress}%</p>
+      </div>
+
       {/* Hero */}
       <div className="section-hero" style={{ flexWrap: 'wrap' }}>
         <div className="section-icon-box" style={{ background: `linear-gradient(135deg, ${section.accent}, ${section.accent}88)` }}>
@@ -178,6 +184,7 @@ export default function SectionPage({ section, store }) {
             <span style={{ fontSize: 9, fontWeight: 700, color: '#f97316', background: 'rgba(249,115,22,0.1)', padding: '2px 8px', borderRadius: 6 }}>Archivé</span>
           )}
         </div>
+        <PrintButton title={`${section.title} — Qualité Béton`} />
         <button
           className="primary-btn"
           onClick={() => setShowAddForm(true)}
@@ -462,6 +469,9 @@ export default function SectionPage({ section, store }) {
                     placeholder="Observations terrain, contexte, mesure..."
                     value={item.comment}
                   />
+                  <span className={`print-text ${!item.comment.trim() ? 'is-empty' : ''}`}>
+                    {item.comment.trim() || 'Aucun commentaire'}
+                  </span>
                 </label>
 
                 <label className="editor-field">
@@ -471,6 +481,9 @@ export default function SectionPage({ section, store }) {
                     placeholder="Action corrective, responsable, délai..."
                     value={item.actionPlan}
                   />
+                  <span className={`print-text ${!item.actionPlan.trim() ? 'is-empty' : ''}`}>
+                    {item.actionPlan.trim() || 'Aucun plan d\'action'}
+                  </span>
                 </label>
               </motion.article>
             )

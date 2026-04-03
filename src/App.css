@@ -1581,3 +1581,441 @@
     padding: 28px 24px;
   }
 }
+
+/* ═══════════════════════════════════════════════
+   Print Button
+   ═══════════════════════════════════════════════ */
+.print-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 18px;
+  background: rgba(148, 163, 184, 0.08);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.print-btn:hover {
+  background: rgba(56, 189, 248, 0.1);
+  border-color: rgba(56, 189, 248, 0.25);
+  color: #38bdf8;
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.08);
+}
+
+.print-btn:active {
+  transform: scale(0.97);
+}
+
+/* ═══════════════════════════════════════════════
+   @media print — Full Print Stylesheet
+   ═══════════════════════════════════════════════ */
+@media print {
+
+  /* ─── Reset dark bg for print ─── */
+  *,
+  *::before,
+  *::after {
+    color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  html,
+  body,
+  #root {
+    background: #fff !important;
+    color: #1e293b !important;
+    font-size: 11px !important;
+    line-height: 1.5 !important;
+  }
+
+  /* ─── Hide non-printable elements ─── */
+  .sidebar,
+  .sidebar-overlay,
+  .top-bar,
+  .mobile-menu-btn,
+  .print-btn,
+  .primary-btn,
+  .secondary-btn,
+  .filter-btn,
+  .status-switch,
+  .status-button,
+  .ambient-orb,
+  .ambient-orb-1,
+  .ambient-orb-2,
+  .ambient-orb-3,
+  .lightbox-overlay,
+  .lightbox-close,
+  .card-image-remove,
+  .card-image-zoom,
+  .section-filter-row,
+  .section-hero button,
+  .login-page,
+  .hero-actions,
+  .sidebar-toggle,
+  .sidebar-logout-btn,
+  input[type="search"],
+  input[type="date"] {
+    display: none !important;
+  }
+
+  /* Hide textareas but show their print-text siblings */
+  .editor-field textarea {
+    display: none !important;
+  }
+
+  .print-text {
+    display: block !important;
+    font-size: 11px !important;
+    color: #334155 !important;
+    padding: 4px 0 !important;
+    white-space: pre-wrap !important;
+    line-height: 1.5 !important;
+    min-height: 0 !important;
+  }
+
+  .print-text.is-empty {
+    color: #94a3b8 !important;
+    font-style: italic !important;
+  }
+
+  /* ─── Layout: remove sidebar margin, allow flow ─── */
+  .app-layout {
+    display: block !important;
+    min-height: auto !important;
+  }
+
+  .main-content,
+  .main-content.sidebar-collapsed {
+    margin-left: 0 !important;
+    min-height: auto !important;
+  }
+
+  .page-content {
+    padding: 0 !important;
+  }
+
+  /* ─── Glass cards → white with border ─── */
+  .glass-card,
+  .checklist-card,
+  .mega-stat {
+    background: #fff !important;
+    backdrop-filter: none !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 8px !important;
+    box-shadow: none !important;
+    color: #1e293b !important;
+    padding: 14px !important;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .glass-card:hover,
+  .checklist-card:hover {
+    transform: none !important;
+    box-shadow: none !important;
+    border-color: #e2e8f0 !important;
+  }
+
+  /* ─── Metric cards ─── */
+  .metric-grid {
+    display: grid !important;
+    grid-template-columns: repeat(4, 1fr) !important;
+    gap: 10px !important;
+    margin-bottom: 16px !important;
+  }
+
+  .metric-card::before {
+    display: none !important;
+  }
+
+  .metric-value {
+    font-size: 22px !important;
+    color: #0f172a !important;
+  }
+
+  .metric-header span,
+  .metric-detail {
+    color: #64748b !important;
+  }
+
+  /* ─── Chart area ─── */
+  .chart-row,
+  .stats-charts-grid {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 12px !important;
+    margin-bottom: 16px !important;
+  }
+
+  .chart-card {
+    min-height: auto !important;
+  }
+
+  /* Recharts SVG: ensure visible on print */
+  .recharts-wrapper,
+  .recharts-surface {
+    overflow: visible !important;
+  }
+
+  .recharts-text,
+  .recharts-cartesian-axis-tick-value {
+    fill: #334155 !important;
+  }
+
+  .recharts-tooltip-wrapper {
+    display: none !important;
+  }
+
+  /* ─── Panel titles ─── */
+  .panel-title {
+    font-size: 13px !important;
+    font-weight: 700 !important;
+    color: #0f172a !important;
+  }
+
+  .panel-subtitle {
+    font-size: 10px !important;
+    color: #64748b !important;
+  }
+
+  /* ─── Content grid ─── */
+  .content-row {
+    display: grid !important;
+    grid-template-columns: 280px 1fr !important;
+    gap: 12px !important;
+  }
+
+  /* ─── Stats mega grid ─── */
+  .stats-mega-grid {
+    display: grid !important;
+    grid-template-columns: repeat(5, 1fr) !important;
+    gap: 8px !important;
+    margin-bottom: 12px !important;
+  }
+
+  .mega-stat::after {
+    display: none !important;
+  }
+
+  .mega-number {
+    font-size: 24px !important;
+    color: #0f172a !important;
+  }
+
+  .mega-label {
+    color: #64748b !important;
+  }
+
+  /* ─── Checklist grid ─── */
+  .checklist-grid {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 10px !important;
+  }
+
+  .checklist-card h3 {
+    color: #0f172a !important;
+    font-size: 12px !important;
+  }
+
+  .section-pill {
+    color: #475569 !important;
+  }
+
+  .status-tag {
+    font-size: 10px !important;
+    border: 1px solid #94a3b8 !important;
+  }
+
+  .timestamp {
+    color: #64748b !important;
+  }
+
+  /* Show text instead of textarea for comments/actionPlans */
+  .editor-field {
+    margin-bottom: 6px !important;
+  }
+
+  .editor-field > span {
+    font-size: 9px !important;
+    color: #475569 !important;
+  }
+
+  /* ─── Focus list ─── */
+  .focus-item {
+    border: 1px solid #e2e8f0 !important;
+    background: #f8fafc !important;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .focus-item.is-critical {
+    border-left: 3px solid #f97316 !important;
+    background: #fff7ed !important;
+  }
+
+  .focus-item p {
+    color: #1e293b !important;
+  }
+
+  .focus-chip {
+    background: #f1f5f9 !important;
+    color: #475569 !important;
+  }
+
+  /* ─── Section hero ─── */
+  .section-hero {
+    margin-bottom: 12px !important;
+  }
+
+  .section-hero h1 {
+    font-size: 18px !important;
+    color: #0f172a !important;
+  }
+
+  .section-hero p {
+    color: #64748b !important;
+  }
+
+  .section-icon-box {
+    width: 40px !important;
+    height: 40px !important;
+    border-radius: 10px !important;
+  }
+
+  .section-progress-bar {
+    height: 5px !important;
+    background: #e2e8f0 !important;
+    margin-bottom: 12px !important;
+  }
+
+  .section-stats-row {
+    gap: 8px !important;
+    margin-bottom: 12px !important;
+  }
+
+  .section-stat-card .stat-number {
+    font-size: 20px !important;
+  }
+
+  /* ─── Stats page header ─── */
+  .stats-header h1 {
+    font-size: 18px !important;
+    color: #0f172a !important;
+  }
+
+  .stats-header p {
+    color: #64748b !important;
+  }
+
+  /* ─── Table for stats ─── */
+  table {
+    border-collapse: collapse !important;
+    width: 100% !important;
+  }
+
+  table th {
+    background: #f1f5f9 !important;
+    color: #334155 !important;
+    font-size: 10px !important;
+    padding: 8px !important;
+    border-bottom: 2px solid #cbd5e1 !important;
+  }
+
+  table td {
+    color: #1e293b !important;
+    padding: 8px !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+  }
+
+  /* ─── Timeline ─── */
+  .activity-timeline {
+    gap: 6px !important;
+  }
+
+  .timeline-item {
+    background: #f8fafc !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 6px !important;
+  }
+
+  .timeline-content strong {
+    color: #0f172a !important;
+  }
+
+  .timeline-content span {
+    color: #64748b !important;
+  }
+
+  .timeline-time {
+    color: #64748b !important;
+  }
+
+  /* ─── Legend ─── */
+  .chart-legend-row,
+  .legend-dot {
+    color: #475569 !important;
+  }
+
+  .legend-dot strong {
+    color: #0f172a !important;
+  }
+
+  /* ─── Print header (injected) ─── */
+  .print-header {
+    display: block !important;
+    text-align: center;
+    padding: 12px 0 16px;
+    border-bottom: 2px solid #0f172a;
+    margin-bottom: 20px;
+  }
+
+  .print-header h1 {
+    font-size: 18px !important;
+    font-weight: 800 !important;
+    color: #0f172a !important;
+    margin: 0 0 4px !important;
+  }
+
+  .print-header p {
+    font-size: 11px !important;
+    color: #64748b !important;
+    margin: 0 !important;
+  }
+
+  /* ─── Page breaks ─── */
+  .chart-row,
+  .stats-charts-grid,
+  .content-row {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* ─── Images ─── */
+  .card-images-gallery {
+    display: flex !important;
+    gap: 6px !important;
+  }
+
+  .card-image-thumb {
+    width: 48px !important;
+    height: 48px !important;
+    border: 1px solid #cbd5e1 !important;
+  }
+}
+
+/* ─── Print header & print-text: hidden on screen ─── */
+.print-header {
+  display: none;
+}
+
+.print-text {
+  display: none;
+}

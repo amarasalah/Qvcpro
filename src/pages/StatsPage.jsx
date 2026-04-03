@@ -37,6 +37,7 @@ import {
   Legend,
 } from 'recharts'
 import { CHECKLIST_SECTIONS } from '../data/checklistTemplate'
+import PrintButton from '../components/PrintButton'
 
 const tooltipStyle = {
   background: 'rgba(15,23,42,0.95)',
@@ -139,12 +140,20 @@ export default function StatsPage({ store }) {
       exit={{ opacity: 0, y: -12 }}
       transition={{ duration: 0.35 }}
     >
-      <div className="stats-header">
-        <h1 style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <BarChart3 size={24} style={{ color: '#38bdf8' }} />
-          Statistiques avancées
-        </h1>
-        <p>Analyses détaillées, radar qualité, tendances et répartitions.</p>
+      <div className="print-header">
+        <h1>Statistiques avancées — Checklist Qualité Béton Précontraint</h1>
+        <p>Imprimé le {new Intl.DateTimeFormat('fr-FR', { dateStyle: 'long', timeStyle: 'short' }).format(new Date())} — {totalItems} points — Conformité {conformRate}%</p>
+      </div>
+
+      <div className="stats-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
+        <div>
+          <h1 style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <BarChart3 size={24} style={{ color: '#38bdf8' }} />
+            Statistiques avancées
+          </h1>
+          <p>Analyses détaillées, radar qualité, tendances et répartitions.</p>
+        </div>
+        <PrintButton title="Statistiques — Qualité Béton" />
       </div>
 
       {/* Mega Stats */}

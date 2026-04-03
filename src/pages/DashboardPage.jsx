@@ -38,6 +38,7 @@ import {
   Legend,
 } from 'recharts'
 import { CHECKLIST_SECTIONS, WORKBOOK_SUMMARY } from '../data/checklistTemplate'
+import PrintButton from '../components/PrintButton'
 
 function formatDateTime(value) {
   if (!value) return '—'
@@ -169,6 +170,8 @@ export default function DashboardPage({ store }) {
     },
   ]
 
+  const printDate = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'long', timeStyle: 'short' }).format(new Date())
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
@@ -176,6 +179,11 @@ export default function DashboardPage({ store }) {
       exit={{ opacity: 0, y: -12 }}
       transition={{ duration: 0.35 }}
     >
+      <div className="print-header">
+        <h1>Tableau de bord — Checklist Qualité Béton Précontraint</h1>
+        <p>Imprimé le {printDate} — {items.length} points de contrôle — Couverture {completionRate}%</p>
+      </div>
+
       {/* Hero Section */}
       <motion.div
         className="glass-card"
@@ -254,6 +262,7 @@ export default function DashboardPage({ store }) {
             <RefreshCcw className={firebaseState.loading ? 'spin' : ''} size={14} />
             Recharger
           </button>
+          <PrintButton title="Tableau de bord — Qualité Béton" />
         </div>
         {firebaseState.error && (
           <p style={{ color: '#ef4444', fontSize: 12, marginTop: 10 }}>{firebaseState.error}</p>

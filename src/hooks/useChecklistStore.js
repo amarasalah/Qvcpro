@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   CHECKLIST_SECTIONS,
   createChecklistItems,
@@ -14,9 +14,24 @@ import {
 } from '../lib/firebase'
 
 const FIREBASE_READY = isFirebaseConfigured()
+const LS_PREFIX = 'qvc-checklist-'
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10) // YYYY-MM-DD
+}
+
+function loadFromLocalStorage(dateStr) {
+  try {
+    const raw = localStorage.getItem(LS_PREFIX + dateStr)
+    if (raw) return JSON.parse(raw)
+  } catch { /* ignore */ }
+  return null
+}
+
+function saveToLocalStorage(dateStr, items) {
+  try {
+    localStorage.setItem(LS_PREFIX + dateStr, JSON.stringify(items))
+  } catch { /* ignore */ }
 }
 
 const STATUS_OPTIONS = [
@@ -41,7 +56,10 @@ const SECTION_LOOKUP = CHECKLIST_SECTIONS.reduce((m, s) => {
 
 export function useChecklistStore() {
   const [currentDate, setCurrentDate] = useState(todayStr())
-  const [items, setItems] = useState(() => createChecklistItems())
+  const [items, setItems] = useState(() => {
+    const cached = loadFromLocalStorage(todayStr())
+    return cached && cached.length > 0 ? cached : createChecklistItems()
+  })
   const [searchQuery, setSearchQuery] = useState('')
   const [availableDates, setAvailableDates] = useState([])
   const [firebaseState, setFirebaseState] = useState({
@@ -52,7 +70,33 @@ export function useChecklistStore() {
     remoteCount: 0,
   })
 
+  const saveTimers = useRef({})
+  const currentDateRef = useRef(currentDate)
+  currentDateRef.current = currentDate
+
   const isToday = currentDate === todayStr()
+
+  // Persist items to localStorage on every change
+  useEffect(() => {
+    saveToLocalStorage(currentDate, items)
+  }, [items, currentDate])
+
+  // Auto-save a single item to Firebase (debounced 600ms)
+  const saveItemToFirebase = useCallback((item) => {
+    if (!FIREBASE_READY) return
+    const key = item.id
+    if (saveTimers.current[key]) clearTimeout(saveTimers.current[key])
+    saveTimers.current[key] = setTimeout(async () => {
+      try {
+        await saveDailyItem(currentDateRef.current, {
+          ...item,
+          sectionIndex: SECTION_INDEX_LOOKUP[item.sectionId] ?? 0,
+        })
+      } catch (err) {
+        console.warn('Auto-save failed for', item.id, err)
+      }
+    }, 600)
+  }, [])
 
   // Load daily checklist from Firebase
   const loadDailyItems = useCallback(async (date) => {
@@ -68,10 +112,17 @@ export function useChecklistStore() {
         // Also include any custom items not in template
         const templateIds = new Set(template.map((t) => t.id))
         const extras = remote.filter((r) => !templateIds.has(r.id))
-        setItems([...merged, ...extras])
+        const finalItems = [...merged, ...extras]
+        setItems(finalItems)
+        saveToLocalStorage(date, finalItems)
       } else {
-        // No data for this date — create fresh from template
-        setItems(createChecklistItems())
+        // No remote data — try localStorage, else create fresh
+        const cached = loadFromLocalStorage(date)
+        if (cached && cached.length > 0) {
+          setItems(cached)
+        } else {
+          setItems(createChecklistItems())
+        }
       }
       setFirebaseState((s) => ({
         ...s,
@@ -80,6 +131,9 @@ export function useChecklistStore() {
         remoteCount: remote.length,
       }))
     } catch (err) {
+      // On Firebase error, fallback to localStorage
+      const cached = loadFromLocalStorage(date)
+      if (cached && cached.length > 0) setItems(cached)
       setFirebaseState((s) => ({
         ...s,
         loading: false,
@@ -138,18 +192,21 @@ export function useChecklistStore() {
     await loadDailyItems(currentDate)
   }, [currentDate, loadDailyItems])
 
-  // Update single item
+  // Update single item — auto-saves to Firebase
   const handleItemChange = useCallback((itemId, field, value) => {
-    setItems((cur) =>
-      cur.map((item) =>
+    setItems((cur) => {
+      const updated = cur.map((item) =>
         item.id === itemId
           ? { ...item, [field]: value, lastUpdated: Date.now() }
           : item,
-      ),
-    )
-  }, [])
+      )
+      const changedItem = updated.find((i) => i.id === itemId)
+      if (changedItem) saveItemToFirebase(changedItem)
+      return updated
+    })
+  }, [saveItemToFirebase])
 
-  // Add new item
+  // Add new item — auto-saves to Firebase
   const addItem = useCallback((sectionId, pointText) => {
     const section = SECTION_LOOKUP[sectionId]
     if (!section || !pointText.trim()) return null
@@ -172,8 +229,9 @@ export function useChecklistStore() {
     }
 
     setItems((cur) => [...cur, newItem])
+    saveItemToFirebase(newItem)
     return newItem
-  }, [items])
+  }, [items, saveItemToFirebase])
 
   // Delete item
   const deleteItem = useCallback(async (itemId) => {
@@ -183,26 +241,32 @@ export function useChecklistStore() {
     }
   }, [currentDate])
 
-  // Image operations
+  // Image operations — auto-save to Firebase
   const addImage = useCallback((itemId, imageData) => {
-    setItems((cur) =>
-      cur.map((item) =>
+    setItems((cur) => {
+      const updated = cur.map((item) =>
         item.id === itemId
           ? { ...item, images: [...(item.images || []), imageData], lastUpdated: Date.now() }
           : item,
-      ),
-    )
-  }, [])
+      )
+      const changedItem = updated.find((i) => i.id === itemId)
+      if (changedItem) saveItemToFirebase(changedItem)
+      return updated
+    })
+  }, [saveItemToFirebase])
 
   const removeImage = useCallback((itemId, publicId) => {
-    setItems((cur) =>
-      cur.map((item) =>
+    setItems((cur) => {
+      const updated = cur.map((item) =>
         item.id === itemId
           ? { ...item, images: (item.images || []).filter((img) => img.publicId !== publicId), lastUpdated: Date.now() }
           : item,
-      ),
-    )
-  }, [])
+      )
+      const changedItem = updated.find((i) => i.id === itemId)
+      if (changedItem) saveItemToFirebase(changedItem)
+      return updated
+    })
+  }, [saveItemToFirebase])
 
   // Change date
   const switchDate = useCallback((newDate) => {

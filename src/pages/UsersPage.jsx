@@ -255,14 +255,14 @@ export default function UsersPage() {
             <motion.div
               className="glass-card"
               style={{
-                position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
-                zIndex: 999, width: '90%', maxWidth: 480, maxHeight: '85vh',
+                position: 'fixed', inset: 0, margin: 'auto',
+                zIndex: 999, width: '90%', maxWidth: 480, height: 'fit-content', maxHeight: '85vh',
                 display: 'flex', flexDirection: 'column', overflow: 'hidden',
               }}
-              initial={{ opacity: 0, scale: 0.92, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.92, y: 20 }}
-              transition={{ duration: 0.25 }}
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ duration: 0.2 }}
             >
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
                 <h2 style={{ fontSize: 17, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>

@@ -1583,6 +1583,133 @@
 }
 
 /* ═══════════════════════════════════════════════
+   Report Filters
+   ═══════════════════════════════════════════════ */
+.report-filters {
+  margin-bottom: 20px;
+}
+
+.report-filters-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.filter-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 16px;
+  background: rgba(148, 163, 184, 0.06);
+  border: 1px solid rgba(148, 163, 184, 0.1);
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+  position: relative;
+}
+
+.filter-toggle-btn:hover {
+  background: rgba(56, 189, 248, 0.08);
+  border-color: rgba(56, 189, 248, 0.2);
+  color: #38bdf8;
+}
+
+.filter-badge {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 8px;
+  height: 8px;
+  background: #38bdf8;
+  border-radius: 50%;
+  border: 2px solid #0f172a;
+}
+
+.filter-reset-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  background: rgba(239, 68, 68, 0.06);
+  border: 1px solid rgba(239, 68, 68, 0.12);
+  color: #f87171;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.filter-reset-btn:hover {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.25);
+}
+
+.report-filters-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 16px;
+  background: rgba(148, 163, 184, 0.04);
+  border: 1px solid rgba(148, 163, 184, 0.08);
+  border-radius: 12px;
+}
+
+.report-filter-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 140px;
+  flex: 1;
+}
+
+.report-filter-field > span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.report-filter-field input,
+.report-filter-field select {
+  width: 100%;
+  background: rgba(148, 163, 184, 0.06);
+  border: 1px solid rgba(148, 163, 184, 0.1);
+  border-radius: 8px;
+  color: #f1f5f9;
+  font-size: 12px;
+  padding: 8px 10px;
+  outline: none;
+  font-family: inherit;
+  transition: border-color 0.2s;
+}
+
+.report-filter-field input:focus,
+.report-filter-field select:focus {
+  border-color: rgba(56, 189, 248, 0.3);
+}
+
+.report-filter-field select option {
+  background: #1e293b;
+  color: #f1f5f9;
+}
+
+/* Hidden on screen, shown in print */
+.print-filter-summary {
+  display: none;
+}
+
+/* ═══════════════════════════════════════════════
    Print Button
    ═══════════════════════════════════════════════ */
 .print-btn {
@@ -1660,9 +1787,31 @@
   .hero-actions,
   .sidebar-toggle,
   .sidebar-logout-btn,
-  input[type="search"],
-  input[type="date"] {
+  .report-filters-toggle,
+  .report-filters-row,
+  input[type="search"] {
     display: none !important;
+  }
+
+  .print-filter-summary {
+    display: flex !important;
+    flex-wrap: wrap;
+    gap: 8px;
+    font-size: 11px !important;
+    color: #475569 !important;
+    padding: 8px 12px !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 6px !important;
+    margin-bottom: 14px !important;
+    background: #f8fafc !important;
+  }
+
+  .print-filter-summary strong {
+    color: #0f172a !important;
+  }
+
+  .print-filter-summary span {
+    color: #334155 !important;
   }
 
   /* Hide textareas but show their print-text siblings */

@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 import { uploadImage, isCloudinaryConfigured } from '../lib/cloudinary'
 import PrintButton from '../components/PrintButton'
+import ReportFilters from '../components/ReportFilters'
 
 const SECTION_ICONS = {
   production: Factory,
@@ -38,6 +39,10 @@ export default function SectionPage({ section, store }) {
   const { items, handleItemChange, addItem, deleteItem, addImage, removeImage, currentDate, isToday, switchDate, STATUS_OPTIONS, STATUS_META } = store
   const [statusFilter, setStatusFilter] = useState('all')
   const [localSearch, setLocalSearch] = useState('')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
+
+  const resetFilters = () => { setDateFrom(''); setDateTo(''); setStatusFilter('all') }
 
   // Create new task state
   const [showAddForm, setShowAddForm] = useState(false)
@@ -87,9 +92,18 @@ export default function SectionPage({ section, store }) {
             .join(' ')
             .toLowerCase()
             .includes(query)
-        return matchStatus && matchQuery
+        let matchDate = true
+        if (dateFrom && item.lastUpdated) {
+          const d = new Date(item.lastUpdated).toISOString().slice(0, 10)
+          if (d < dateFrom) matchDate = false
+        }
+        if (dateTo && item.lastUpdated) {
+          const d = new Date(item.lastUpdated).toISOString().slice(0, 10)
+          if (d > dateTo) matchDate = false
+        }
+        return matchStatus && matchQuery && matchDate
       }),
-    [sectionItems, statusFilter, query, STATUS_META],
+    [sectionItems, statusFilter, query, STATUS_META, dateFrom, dateTo],
   )
 
   const Icon = SECTION_ICONS[section.id] || CheckCircle2
@@ -195,6 +209,20 @@ export default function SectionPage({ section, store }) {
           Nouveau contrôle
         </button>
       </div>
+
+      <ReportFilters
+        dateFrom={dateFrom}
+        dateTo={dateTo}
+        statusFilter={statusFilter}
+        sectionFilter="all"
+        onDateFromChange={setDateFrom}
+        onDateToChange={setDateTo}
+        onStatusChange={setStatusFilter}
+        onSectionChange={() => {}}
+        onReset={resetFilters}
+        sections={[]}
+        showSectionFilter={false}
+      />
 
       {/* Add Task Form */}
       <AnimatePresence>

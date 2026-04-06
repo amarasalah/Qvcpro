@@ -256,7 +256,8 @@ export default function UsersPage() {
               className="glass-card"
               style={{
                 position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
-                zIndex: 999, width: '90%', maxWidth: 480, maxHeight: '85vh', overflow: 'auto',
+                zIndex: 999, width: '90%', maxWidth: 480, maxHeight: '85vh',
+                display: 'flex', flexDirection: 'column', overflow: 'hidden',
               }}
               initial={{ opacity: 0, scale: 0.92, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -274,7 +275,7 @@ export default function UsersPage() {
                 </button>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, display: 'flex', flexDirection: 'column', gap: 14 }}>
                 {/* Display name */}
                 <div>
                   <label style={{ fontSize: 11, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -352,15 +353,16 @@ export default function UsersPage() {
                   )}
                 </AnimatePresence>
 
-                {/* Save */}
-                <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 6 }}>
+              </div>
+
+                {/* Save — sticky footer */}
+                <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', padding: '14px 0 0', borderTop: '1px solid rgba(148,163,184,0.1)', flexShrink: 0 }}>
                   <button className="secondary-btn" onClick={() => setShowModal(false)} type="button">Annuler</button>
                   <button className="primary-btn" onClick={handleSave} disabled={saving} type="button">
                     {saving ? <Loader2 size={14} className="spin" /> : <Save size={14} />}
                     {editingUser ? 'Mettre à jour' : 'Créer'}
                   </button>
                 </div>
-              </div>
             </motion.div>
           </>
         )}

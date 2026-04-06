@@ -1,3 +1,4 @@
+import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import {
   Activity,
@@ -39,6 +40,7 @@ import {
 } from 'recharts'
 import { CHECKLIST_SECTIONS, WORKBOOK_SUMMARY } from '../data/checklistTemplate'
 import PrintButton from '../components/PrintButton'
+import ReportFilters from '../components/ReportFilters'
 
 function formatDateTime(value) {
   if (!value) return '—'
@@ -64,9 +66,6 @@ export default function DashboardPage({ store }) {
     isToday,
     switchDate,
     availableDates,
-    statusCounts,
-    sectionChartData,
-    statusChartData,
     focusItems,
     firebaseState,
     firebaseReady,
@@ -76,6 +75,48 @@ export default function DashboardPage({ store }) {
     SECTION_LOOKUP,
     recentActivity,
   } = store
+
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [sectionFilter, setSectionFilter] = useState('all')
+
+  const resetFilters = () => { setDateFrom(''); setDateTo(''); setStatusFilter('all'); setSectionFilter('all') }
+
+  const filtered = useMemo(() => items.filter((item) => {
+    if (statusFilter !== 'all' && item.status !== statusFilter) return false
+    if (sectionFilter !== 'all' && item.sectionId !== sectionFilter) return false
+    if (dateFrom && item.lastUpdated) {
+      const d = new Date(item.lastUpdated).toISOString().slice(0, 10)
+      if (d < dateFrom) return false
+    }
+    if (dateTo && item.lastUpdated) {
+      const d = new Date(item.lastUpdated).toISOString().slice(0, 10)
+      if (d > dateTo) return false
+    }
+    return true
+  }), [items, statusFilter, sectionFilter, dateFrom, dateTo])
+
+  const statusCounts = useMemo(() => filtered.reduce((c, i) => { c[i.status] += 1; return c }, { conforming: 0, nonConforming: 0, pending: 0 }), [filtered])
+
+  const sectionChartData = useMemo(() => CHECKLIST_SECTIONS.map((section) => {
+    const sItems = filtered.filter((i) => i.sectionId === section.id)
+    return {
+      name: section.shortTitle,
+      fullName: section.title,
+      conforming: sItems.filter((i) => i.status === 'conforming').length,
+      nonConforming: sItems.filter((i) => i.status === 'nonConforming').length,
+      pending: sItems.filter((i) => i.status === 'pending').length,
+      total: sItems.length,
+      accent: section.accent,
+    }
+  }), [filtered])
+
+  const statusChartData = useMemo(() => [
+    { name: 'Conforme', value: statusCounts.conforming, color: '#22c55e' },
+    { name: 'Non conforme', value: statusCounts.nonConforming, color: '#f97316' },
+    { name: 'À vérifier', value: statusCounts.pending, color: '#94a3b8' },
+  ], [statusCounts])
 
   const goToPrevDay = () => {
     const d = new Date(currentDate)
@@ -92,8 +133,9 @@ export default function DashboardPage({ store }) {
   const goToToday = () => switchDate(new Date().toISOString().slice(0, 10))
 
   // Line chart data — conformity rate per section
-  const lineChartData = CHECKLIST_SECTIONS.map((section) => {
-    const sItems = items.filter((i) => i.sectionId === section.id)
+  const lineChartData = useMemo(() => CHECKLIST_SECTIONS.map((section) => {
+    const sItems = filtered.filter((i) => i.sectionId === section.id)
+    if (!sItems.length) return { name: section.shortTitle, conformité: 0, couverture: 0, nonConformité: 0 }
     const conf = sItems.filter((i) => i.status === 'conforming').length
     const nc = sItems.filter((i) => i.status === 'nonConforming').length
     const done = conf + nc
@@ -103,18 +145,18 @@ export default function DashboardPage({ store }) {
       couverture: Math.round((done / sItems.length) * 100),
       nonConformité: Math.round((nc / sItems.length) * 100),
     }
-  })
+  }), [filtered])
 
   // Cumulative line data from updates
-  const cumulativeLineData = (() => {
-    const updates = items
+  const cumulativeLineData = useMemo(() => {
+    const updates = filtered
       .filter((i) => i.lastUpdated)
       .sort((a, b) => (a.lastUpdated || 0) - (b.lastUpdated || 0))
     if (!updates.length) return []
-    let cumC = 0, cumNC = 0, cumP = items.length
+    let cumC = 0, cumNC = 0
     return updates.map((item, idx) => {
-      if (item.status === 'conforming') { cumC++; cumP-- }
-      if (item.status === 'nonConforming') { cumNC++; cumP-- }
+      if (item.status === 'conforming') cumC++
+      if (item.status === 'nonConforming') cumNC++
       return {
         index: idx + 1,
         conformes: cumC,
@@ -122,27 +164,28 @@ export default function DashboardPage({ store }) {
         traités: cumC + cumNC,
       }
     })
-  })()
+  }, [filtered])
 
   const completionCount = statusCounts.conforming + statusCounts.nonConforming
-  const completionRate = Math.round((completionCount / items.length) * 100)
-  const commentCount = items.filter((i) => i.comment?.trim()).length
-  const actionCount = items.filter((i) => i.actionPlan?.trim()).length
+  const completionRate = filtered.length ? Math.round((completionCount / filtered.length) * 100) : 0
+  const commentCount = filtered.filter((i) => i.comment?.trim()).length
+  const actionCount = filtered.filter((i) => i.actionPlan?.trim()).length
 
-  const radialData = CHECKLIST_SECTIONS.map((section) => {
-    const sItems = items.filter((i) => i.sectionId === section.id)
+  const radialData = useMemo(() => CHECKLIST_SECTIONS.map((section) => {
+    const sItems = filtered.filter((i) => i.sectionId === section.id)
+    if (!sItems.length) return { name: section.shortTitle, value: 0, fill: section.accent }
     const done = sItems.filter((i) => i.status !== 'pending').length
     return {
       name: section.shortTitle,
       value: Math.round((done / sItems.length) * 100),
       fill: section.accent,
     }
-  })
+  }), [filtered])
 
   const metricCards = [
     {
       label: 'Points de contrôle',
-      value: items.length,
+      value: filtered.length,
       icon: FileSpreadsheet,
       detail: `${WORKBOOK_SUMMARY.sheetCount} feuilles analysées`,
       accent: '#38bdf8',
@@ -268,6 +311,20 @@ export default function DashboardPage({ store }) {
           <p style={{ color: '#ef4444', fontSize: 12, marginTop: 10 }}>{firebaseState.error}</p>
         )}
       </motion.div>
+
+      <ReportFilters
+        dateFrom={dateFrom}
+        dateTo={dateTo}
+        statusFilter={statusFilter}
+        sectionFilter={sectionFilter}
+        onDateFromChange={setDateFrom}
+        onDateToChange={setDateTo}
+        onStatusChange={setStatusFilter}
+        onSectionChange={setSectionFilter}
+        onReset={resetFilters}
+        sections={CHECKLIST_SECTIONS}
+        showSectionFilter
+      />
 
       {/* Metric Cards */}
       <div className="metric-grid">

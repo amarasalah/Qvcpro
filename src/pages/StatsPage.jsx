@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import {
   Activity,
@@ -38,6 +38,7 @@ import {
 } from 'recharts'
 import { CHECKLIST_SECTIONS } from '../data/checklistTemplate'
 import PrintButton from '../components/PrintButton'
+import ReportFilters from '../components/ReportFilters'
 
 const tooltipStyle = {
   background: 'rgba(15,23,42,0.95)',
@@ -57,20 +58,70 @@ function formatDateTime(value) {
 }
 
 export default function StatsPage({ store }) {
-  const { items, statusCounts, sectionChartData, statusChartData, recentActivity, STATUS_META, SECTION_LOOKUP } = store
+  const { items, recentActivity, STATUS_META, SECTION_LOOKUP } = store
 
-  const totalItems = items.length
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [sectionFilter, setSectionFilter] = useState('all')
+
+  const resetFilters = () => { setDateFrom(''); setDateTo(''); setStatusFilter('all'); setSectionFilter('all') }
+
+  const filtered = useMemo(() => items.filter((item) => {
+    if (statusFilter !== 'all' && item.status !== statusFilter) return false
+    if (sectionFilter !== 'all' && item.sectionId !== sectionFilter) return false
+    if (dateFrom && item.lastUpdated) {
+      const d = new Date(item.lastUpdated).toISOString().slice(0, 10)
+      if (d < dateFrom) return false
+    }
+    if (dateTo && item.lastUpdated) {
+      const d = new Date(item.lastUpdated).toISOString().slice(0, 10)
+      if (d > dateTo) return false
+    }
+    return true
+  }), [items, statusFilter, sectionFilter, dateFrom, dateTo])
+
+  const totalItems = filtered.length
+  const statusCounts = useMemo(() => filtered.reduce((c, i) => { c[i.status] += 1; return c }, { conforming: 0, nonConforming: 0, pending: 0 }), [filtered])
   const completionCount = statusCounts.conforming + statusCounts.nonConforming
-  const completionRate = Math.round((completionCount / totalItems) * 100)
-  const conformRate = Math.round((statusCounts.conforming / totalItems) * 100)
-  const commentCount = items.filter((i) => i.comment.trim()).length
-  const actionCount = items.filter((i) => i.actionPlan.trim()).length
-  const criticalCount = items.filter((i) => i.status === 'nonConforming' && !i.actionPlan.trim()).length
+  const completionRate = totalItems ? Math.round((completionCount / totalItems) * 100) : 0
+  const conformRate = totalItems ? Math.round((statusCounts.conforming / totalItems) * 100) : 0
+  const commentCount = filtered.filter((i) => i.comment.trim()).length
+  const actionCount = filtered.filter((i) => i.actionPlan.trim()).length
+  const criticalCount = filtered.filter((i) => i.status === 'nonConforming' && !i.actionPlan.trim()).length
+
+  const sectionChartData = useMemo(
+    () =>
+      CHECKLIST_SECTIONS.map((section) => {
+        const sItems = filtered.filter((i) => i.sectionId === section.id)
+        return {
+          name: section.shortTitle,
+          fullName: section.title,
+          conforming: sItems.filter((i) => i.status === 'conforming').length,
+          nonConforming: sItems.filter((i) => i.status === 'nonConforming').length,
+          pending: sItems.filter((i) => i.status === 'pending').length,
+          total: sItems.length,
+          accent: section.accent,
+        }
+      }),
+    [filtered],
+  )
+
+  const statusChartData = useMemo(
+    () =>
+      [
+        { name: 'Conforme', value: statusCounts.conforming, color: '#22c55e' },
+        { name: 'Non conforme', value: statusCounts.nonConforming, color: '#f97316' },
+        { name: 'À vérifier', value: statusCounts.pending, color: '#94a3b8' },
+      ],
+    [statusCounts],
+  )
 
   const radarData = useMemo(
     () =>
       CHECKLIST_SECTIONS.map((section) => {
-        const sItems = items.filter((i) => i.sectionId === section.id)
+        const sItems = filtered.filter((i) => i.sectionId === section.id)
+        if (!sItems.length) return { subject: section.shortTitle, conformité: 0, couverture: 0, documentation: 0, plans: 0 }
         const conf = sItems.filter((i) => i.status === 'conforming').length
         const nc = sItems.filter((i) => i.status === 'nonConforming').length
         const commented = sItems.filter((i) => i.comment.trim()).length
@@ -83,13 +134,13 @@ export default function StatsPage({ store }) {
           plans: Math.round((actioned / sItems.length) * 100),
         }
       }),
-    [items],
+    [filtered],
   )
 
   const sectionDetailData = useMemo(
     () =>
       CHECKLIST_SECTIONS.map((section) => {
-        const sItems = items.filter((i) => i.sectionId === section.id)
+        const sItems = filtered.filter((i) => i.sectionId === section.id)
         const conf = sItems.filter((i) => i.status === 'conforming').length
         const nc = sItems.filter((i) => i.status === 'nonConforming').length
         return {
@@ -98,15 +149,15 @@ export default function StatsPage({ store }) {
           conformes: conf,
           nonConformes: nc,
           pending: sItems.filter((i) => i.status === 'pending').length,
-          rate: Math.round((conf / sItems.length) * 100),
+          rate: sItems.length ? Math.round((conf / sItems.length) * 100) : 0,
           accent: section.accent,
         }
       }),
-    [items],
+    [filtered],
   )
 
   const progressOverTime = useMemo(() => {
-    const updates = items
+    const updates = filtered
       .filter((i) => i.lastUpdated)
       .sort((a, b) => (a.lastUpdated || 0) - (b.lastUpdated || 0))
 
@@ -123,7 +174,7 @@ export default function StatsPage({ store }) {
         total: cumConf + cumNc,
       }
     })
-  }, [items])
+  }, [filtered])
 
   const megaStats = [
     { label: 'Total', value: totalItems, icon: FileSpreadsheet, accent: '#38bdf8' },
@@ -155,6 +206,20 @@ export default function StatsPage({ store }) {
         </div>
         <PrintButton title="Statistiques — Qualité Béton" />
       </div>
+
+      <ReportFilters
+        dateFrom={dateFrom}
+        dateTo={dateTo}
+        statusFilter={statusFilter}
+        sectionFilter={sectionFilter}
+        onDateFromChange={setDateFrom}
+        onDateToChange={setDateTo}
+        onStatusChange={setStatusFilter}
+        onSectionChange={setSectionFilter}
+        onReset={resetFilters}
+        sections={CHECKLIST_SECTIONS}
+        showSectionFilter
+      />
 
       {/* Mega Stats */}
       <div className="stats-mega-grid">
@@ -332,7 +397,8 @@ export default function StatsPage({ store }) {
           <p className="panel-subtitle">Taux de conformité et couverture par section</p>
           <ResponsiveContainer height={280} width="100%">
             <LineChart data={CHECKLIST_SECTIONS.map((section) => {
-              const sItems = items.filter((i) => i.sectionId === section.id)
+              const sItems = filtered.filter((i) => i.sectionId === section.id)
+              if (!sItems.length) return { name: section.shortTitle, conformité: 0, couverture: 0, nonConformité: 0, documentation: 0 }
               const conf = sItems.filter((i) => i.status === 'conforming').length
               const nc = sItems.filter((i) => i.status === 'nonConforming').length
               return {

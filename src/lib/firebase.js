@@ -142,6 +142,60 @@ export async function fetchRole(roleId) {
   return snap.exists() ? { id: snap.id, ...snap.data() } : null
 }
 
+// ---------- MODULES ----------
+export async function fetchModules() {
+  if (!db) return []
+  const snap = await getDocs(collection(db, 'modules'))
+  return snap.docs
+    .map((d) => ({ id: d.id, ...d.data() }))
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+}
+
+export async function saveModule(moduleId, data) {
+  if (!db) return
+  await setDoc(doc(db, 'modules', moduleId), { ...data, updatedAt: serverTimestamp() }, { merge: true })
+}
+
+export async function deleteModule(moduleId) {
+  if (!db) return
+  await deleteDoc(doc(db, 'modules', moduleId))
+}
+
+/**
+ * Seeds the modules collection from the provided sections array.
+ * Only creates documents that don't already exist.
+ */
+export async function seedModules(sections) {
+  if (!db) return false
+  const existing = await fetchModules()
+  const existingIds = new Set(existing.map((m) => m.id))
+
+  const batch = writeBatch(db)
+  let seeded = 0
+
+  sections.forEach((section, index) => {
+    if (!existingIds.has(section.id)) {
+      batch.set(doc(db, 'modules', section.id), {
+        title: section.title,
+        shortTitle: section.shortTitle,
+        accent: section.accent,
+        icon: section.icon || 'ClipboardCheck',
+        description: section.description,
+        items: section.items,
+        order: index,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      })
+      seeded++
+    }
+  })
+
+  if (seeded > 0) {
+    await batch.commit()
+  }
+  return seeded
+}
+
 // ---------- DAILY CHECKLISTS ----------
 function dailyItemsRef(dateStr) {
   return collection(db, 'dailyChecklists', dateStr, 'items')

@@ -36,7 +36,7 @@ import {
   RadialBar,
   Legend,
 } from 'recharts'
-import { CHECKLIST_SECTIONS } from '../data/checklistTemplate'
+
 import PrintButton from '../components/PrintButton'
 import ReportFilters from '../components/ReportFilters'
 
@@ -58,7 +58,7 @@ function formatDateTime(value) {
 }
 
 export default function StatsPage({ store }) {
-  const { items, recentActivity, STATUS_META, SECTION_LOOKUP } = store
+  const { items, modules, recentActivity, STATUS_META, SECTION_LOOKUP } = store
 
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
@@ -70,13 +70,11 @@ export default function StatsPage({ store }) {
   const filtered = useMemo(() => items.filter((item) => {
     if (statusFilter !== 'all' && item.status !== statusFilter) return false
     if (sectionFilter !== 'all' && item.sectionId !== sectionFilter) return false
-    if (dateFrom && item.lastUpdated) {
+    if (dateFrom || dateTo) {
+      if (!item.lastUpdated) return false
       const d = new Date(item.lastUpdated).toISOString().slice(0, 10)
-      if (d < dateFrom) return false
-    }
-    if (dateTo && item.lastUpdated) {
-      const d = new Date(item.lastUpdated).toISOString().slice(0, 10)
-      if (d > dateTo) return false
+      if (dateFrom && d < dateFrom) return false
+      if (dateTo && d > dateTo) return false
     }
     return true
   }), [items, statusFilter, sectionFilter, dateFrom, dateTo])
@@ -86,13 +84,13 @@ export default function StatsPage({ store }) {
   const completionCount = statusCounts.conforming + statusCounts.nonConforming
   const completionRate = totalItems ? Math.round((completionCount / totalItems) * 100) : 0
   const conformRate = totalItems ? Math.round((statusCounts.conforming / totalItems) * 100) : 0
-  const commentCount = filtered.filter((i) => i.comment.trim()).length
-  const actionCount = filtered.filter((i) => i.actionPlan.trim()).length
-  const criticalCount = filtered.filter((i) => i.status === 'nonConforming' && !i.actionPlan.trim()).length
+  const commentCount = filtered.filter((i) => i.comment?.trim()).length
+  const actionCount = filtered.filter((i) => i.actionPlan?.trim()).length
+  const criticalCount = filtered.filter((i) => i.status === 'nonConforming' && !i.actionPlan?.trim()).length
 
   const sectionChartData = useMemo(
     () =>
-      CHECKLIST_SECTIONS.map((section) => {
+      modules.map((section) => {
         const sItems = filtered.filter((i) => i.sectionId === section.id)
         return {
           name: section.shortTitle,
@@ -104,7 +102,7 @@ export default function StatsPage({ store }) {
           accent: section.accent,
         }
       }),
-    [filtered],
+    [filtered, modules],
   )
 
   const statusChartData = useMemo(
@@ -119,13 +117,13 @@ export default function StatsPage({ store }) {
 
   const radarData = useMemo(
     () =>
-      CHECKLIST_SECTIONS.map((section) => {
+      modules.map((section) => {
         const sItems = filtered.filter((i) => i.sectionId === section.id)
         if (!sItems.length) return { subject: section.shortTitle, conformité: 0, couverture: 0, documentation: 0, plans: 0 }
         const conf = sItems.filter((i) => i.status === 'conforming').length
         const nc = sItems.filter((i) => i.status === 'nonConforming').length
-        const commented = sItems.filter((i) => i.comment.trim()).length
-        const actioned = sItems.filter((i) => i.actionPlan.trim()).length
+        const commented = sItems.filter((i) => i.comment?.trim()).length
+        const actioned = sItems.filter((i) => i.actionPlan?.trim()).length
         return {
           subject: section.shortTitle,
           conformité: Math.round((conf / sItems.length) * 100),
@@ -134,12 +132,12 @@ export default function StatsPage({ store }) {
           plans: Math.round((actioned / sItems.length) * 100),
         }
       }),
-    [filtered],
+    [filtered, modules],
   )
 
   const sectionDetailData = useMemo(
     () =>
-      CHECKLIST_SECTIONS.map((section) => {
+      modules.map((section) => {
         const sItems = filtered.filter((i) => i.sectionId === section.id)
         const conf = sItems.filter((i) => i.status === 'conforming').length
         const nc = sItems.filter((i) => i.status === 'nonConforming').length
@@ -153,7 +151,7 @@ export default function StatsPage({ store }) {
           accent: section.accent,
         }
       }),
-    [filtered],
+    [filtered, modules],
   )
 
   const progressOverTime = useMemo(() => {
@@ -193,7 +191,7 @@ export default function StatsPage({ store }) {
     >
       <div className="print-header">
         <h1>Statistiques avancées — Checklist Qualité Béton Précontraint</h1>
-        <p>Imprimé le {new Intl.DateTimeFormat('fr-FR', { dateStyle: 'long', timeStyle: 'short' }).format(new Date())} — {totalItems} points — Conformité {conformRate}%</p>
+        <p>Imprimé le {new Intl.DateTimeFormat('fr-FR', { dateStyle: 'long', timeStyle: 'short' }).format(new Date())} — {totalItems} points{totalItems !== items.length ? ` (filtrés sur ${items.length})` : ''} — Conformité {conformRate}%</p>
       </div>
 
       <div className="stats-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
@@ -217,7 +215,7 @@ export default function StatsPage({ store }) {
         onStatusChange={setStatusFilter}
         onSectionChange={setSectionFilter}
         onReset={resetFilters}
-        sections={CHECKLIST_SECTIONS}
+        sections={modules}
         showSectionFilter
       />
 
@@ -396,7 +394,7 @@ export default function StatsPage({ store }) {
           <h2 className="panel-title">Ligne de conformité</h2>
           <p className="panel-subtitle">Taux de conformité et couverture par section</p>
           <ResponsiveContainer height={280} width="100%">
-            <LineChart data={CHECKLIST_SECTIONS.map((section) => {
+            <LineChart data={modules.map((section) => {
               const sItems = filtered.filter((i) => i.sectionId === section.id)
               if (!sItems.length) return { name: section.shortTitle, conformité: 0, couverture: 0, nonConformité: 0, documentation: 0 }
               const conf = sItems.filter((i) => i.status === 'conforming').length
@@ -406,7 +404,7 @@ export default function StatsPage({ store }) {
                 conformité: Math.round((conf / sItems.length) * 100),
                 couverture: Math.round(((conf + nc) / sItems.length) * 100),
                 nonConformité: Math.round((nc / sItems.length) * 100),
-                documentation: Math.round((sItems.filter((i) => i.comment.trim()).length / sItems.length) * 100),
+                documentation: Math.round((sItems.filter((i) => i.comment?.trim()).length / sItems.length) * 100),
               }
             })}>
               <CartesianGrid stroke="rgba(148,163,184,0.08)" vertical={false} />

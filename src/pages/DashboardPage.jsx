@@ -38,7 +38,7 @@ import {
   RadialBar,
   Legend,
 } from 'recharts'
-import { CHECKLIST_SECTIONS, WORKBOOK_SUMMARY } from '../data/checklistTemplate'
+import { WORKBOOK_SUMMARY } from '../data/checklistTemplate'
 import PrintButton from '../components/PrintButton'
 import ReportFilters from '../components/ReportFilters'
 
@@ -62,6 +62,7 @@ const tooltipStyle = {
 export default function DashboardPage({ store }) {
   const {
     items,
+    modules,
     currentDate,
     isToday,
     switchDate,
@@ -86,20 +87,18 @@ export default function DashboardPage({ store }) {
   const filtered = useMemo(() => items.filter((item) => {
     if (statusFilter !== 'all' && item.status !== statusFilter) return false
     if (sectionFilter !== 'all' && item.sectionId !== sectionFilter) return false
-    if (dateFrom && item.lastUpdated) {
+    if (dateFrom || dateTo) {
+      if (!item.lastUpdated) return false
       const d = new Date(item.lastUpdated).toISOString().slice(0, 10)
-      if (d < dateFrom) return false
-    }
-    if (dateTo && item.lastUpdated) {
-      const d = new Date(item.lastUpdated).toISOString().slice(0, 10)
-      if (d > dateTo) return false
+      if (dateFrom && d < dateFrom) return false
+      if (dateTo && d > dateTo) return false
     }
     return true
   }), [items, statusFilter, sectionFilter, dateFrom, dateTo])
 
   const statusCounts = useMemo(() => filtered.reduce((c, i) => { c[i.status] += 1; return c }, { conforming: 0, nonConforming: 0, pending: 0 }), [filtered])
 
-  const sectionChartData = useMemo(() => CHECKLIST_SECTIONS.map((section) => {
+  const sectionChartData = useMemo(() => modules.map((section) => {
     const sItems = filtered.filter((i) => i.sectionId === section.id)
     return {
       name: section.shortTitle,
@@ -110,7 +109,7 @@ export default function DashboardPage({ store }) {
       total: sItems.length,
       accent: section.accent,
     }
-  }), [filtered])
+  }), [filtered, modules])
 
   const statusChartData = useMemo(() => [
     { name: 'Conforme', value: statusCounts.conforming, color: '#22c55e' },
@@ -133,7 +132,7 @@ export default function DashboardPage({ store }) {
   const goToToday = () => switchDate(new Date().toISOString().slice(0, 10))
 
   // Line chart data — conformity rate per section
-  const lineChartData = useMemo(() => CHECKLIST_SECTIONS.map((section) => {
+  const lineChartData = useMemo(() => modules.map((section) => {
     const sItems = filtered.filter((i) => i.sectionId === section.id)
     if (!sItems.length) return { name: section.shortTitle, conformité: 0, couverture: 0, nonConformité: 0 }
     const conf = sItems.filter((i) => i.status === 'conforming').length
@@ -145,7 +144,7 @@ export default function DashboardPage({ store }) {
       couverture: Math.round((done / sItems.length) * 100),
       nonConformité: Math.round((nc / sItems.length) * 100),
     }
-  }), [filtered])
+  }), [filtered, modules])
 
   // Cumulative line data from updates
   const cumulativeLineData = useMemo(() => {
@@ -171,7 +170,7 @@ export default function DashboardPage({ store }) {
   const commentCount = filtered.filter((i) => i.comment?.trim()).length
   const actionCount = filtered.filter((i) => i.actionPlan?.trim()).length
 
-  const radialData = useMemo(() => CHECKLIST_SECTIONS.map((section) => {
+  const radialData = useMemo(() => modules.map((section) => {
     const sItems = filtered.filter((i) => i.sectionId === section.id)
     if (!sItems.length) return { name: section.shortTitle, value: 0, fill: section.accent }
     const done = sItems.filter((i) => i.status !== 'pending').length
@@ -180,14 +179,14 @@ export default function DashboardPage({ store }) {
       value: Math.round((done / sItems.length) * 100),
       fill: section.accent,
     }
-  }), [filtered])
+  }), [filtered, modules])
 
   const metricCards = [
     {
       label: 'Points de contrôle',
       value: filtered.length,
       icon: FileSpreadsheet,
-      detail: `${WORKBOOK_SUMMARY.sheetCount} feuilles analysées`,
+      detail: `${modules.length} modules actifs`,
       accent: '#38bdf8',
     },
     {
@@ -224,7 +223,7 @@ export default function DashboardPage({ store }) {
     >
       <div className="print-header">
         <h1>Tableau de bord — Checklist Qualité Béton Précontraint</h1>
-        <p>Imprimé le {printDate} — {items.length} points de contrôle — Couverture {completionRate}%</p>
+        <p>Imprimé le {printDate} — Date de checklist : {new Date(currentDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })} — {filtered.length} points de contrôle{filtered.length !== items.length ? ` (filtrés sur ${items.length})` : ''} — Couverture {completionRate}%</p>
       </div>
 
       {/* Hero Section */}
@@ -246,7 +245,7 @@ export default function DashboardPage({ store }) {
               Checklist Qualité Quotidienne
             </h1>
             <p style={{ color: '#64748b', fontSize: 13 }}>
-              <strong style={{ color: '#38bdf8' }}>Production</strong> · <strong style={{ color: '#a78bfa' }}>Assurance</strong> · <strong style={{ color: '#f97316' }}>Contrôle</strong> — synchronisé avec Firebase
+              {modules.slice(0, 4).map((m, i) => (<span key={m.id}>{i > 0 && ' · '}<strong style={{ color: m.accent }}>{m.shortTitle}</strong></span>))} {modules.length > 4 && `+ ${modules.length - 4} modules`} — synchronisé avec Firebase
             </p>
           </div>
 
@@ -322,7 +321,7 @@ export default function DashboardPage({ store }) {
         onStatusChange={setStatusFilter}
         onSectionChange={setSectionFilter}
         onReset={resetFilters}
-        sections={CHECKLIST_SECTIONS}
+        sections={modules}
         showSectionFilter
       />
 
@@ -524,7 +523,7 @@ export default function DashboardPage({ store }) {
                   </div>
                   <p>{item.point}</p>
                   <span className="focus-meta">
-                    {item.actionPlan.trim() || 'Aucun plan d\'action défini.'}
+                    {item.actionPlan?.trim() || 'Aucun plan d\'action défini.'}
                   </span>
                 </div>
               )
@@ -584,7 +583,7 @@ export default function DashboardPage({ store }) {
           {
             icon: Shield,
             title: 'Scan du classeur',
-            content: CHECKLIST_SECTIONS.map((s) => `${s.title}: ${s.items.length} points`).join(' • '),
+            content: modules.map((s) => `${s.title}: ${(s.items || []).length} points`).join(' • '),
           },
           {
             icon: Database,

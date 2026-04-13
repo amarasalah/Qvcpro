@@ -12,7 +12,7 @@ import {
   Wifi,
   WifiOff,
 } from 'lucide-react'
-import { CHECKLIST_SECTIONS, WORKBOOK_SUMMARY } from '../data/checklistTemplate'
+import { WORKBOOK_SUMMARY } from '../data/checklistTemplate'
 
 function formatDateTime(value) {
   if (!value) return '—'
@@ -23,7 +23,7 @@ function formatDateTime(value) {
 }
 
 export default function SettingsPage({ store }) {
-  const { items, firebaseState, firebaseReady, handleSync, loadRemoteItems, statusCounts } = store
+  const { items, modules, firebaseState, firebaseReady, handleSync, loadRemoteItems, statusCounts } = store
 
   const handleExportJSON = () => {
     const data = JSON.stringify(items, null, 2)
@@ -199,13 +199,13 @@ export default function SettingsPage({ store }) {
             <span className="settings-label">Contrôles totaux</span>
             <span className="settings-value">{WORKBOOK_SUMMARY.totalControls}</span>
           </div>
-          {CHECKLIST_SECTIONS.map((s) => (
+          {modules.map((s) => (
             <div className="settings-row" key={s.id}>
               <span className="settings-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span style={{ width: 6, height: 6, borderRadius: '50%', background: s.accent }} />
                 {s.title}
               </span>
-              <span className="settings-value">{s.items.length} points</span>
+              <span className="settings-value">{(s.items || []).length} points</span>
             </div>
           ))}
         </motion.div>

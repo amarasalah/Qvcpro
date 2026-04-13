@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  CHECKLIST_SECTIONS,
+  CHECKLIST_SECTIONS as DEFAULT_SECTIONS,
   createChecklistItems,
 } from '../data/checklistTemplate'
 import {
   deleteDailyItem,
   fetchDailyItems,
+  fetchModules,
   isFirebaseConfigured,
   saveDailyItem,
   saveDailyMeta,
+  seedModules,
   syncDailyItems,
   listChecklistDates,
 } from '../lib/firebase'
@@ -44,17 +46,30 @@ const STATUS_META = Object.fromEntries(
   STATUS_OPTIONS.map((s) => [s.value, s]),
 )
 
-const SECTION_INDEX_LOOKUP = CHECKLIST_SECTIONS.reduce((m, s, i) => {
-  m[s.id] = i
-  return m
-}, {})
-
-const SECTION_LOOKUP = CHECKLIST_SECTIONS.reduce((m, s) => {
-  m[s.id] = s
-  return m
-}, {})
+/**
+ * Create checklist items from a modules array (from Firestore or fallback)
+ */
+function createItemsFromModules(modules) {
+  return modules.flatMap((section) =>
+    (section.items || []).map((point, index) => ({
+      id: `${section.id}-${index + 1}`,
+      sectionId: section.id,
+      sectionTitle: section.title,
+      number: String(index + 1),
+      point,
+      status: 'pending',
+      comment: '',
+      actionPlan: '',
+      lastUpdated: null,
+    })),
+  )
+}
 
 export function useChecklistStore() {
+  // Modules loaded from Firestore (or fallback to static template)
+  const [modules, setModules] = useState(DEFAULT_SECTIONS)
+  const [modulesLoaded, setModulesLoaded] = useState(false)
+
   const [currentDate, setCurrentDate] = useState(todayStr())
   const [items, setItems] = useState(() => {
     const cached = loadFromLocalStorage(todayStr())
@@ -76,6 +91,54 @@ export function useChecklistStore() {
 
   const isToday = currentDate === todayStr()
 
+  // Build lookups from dynamic modules
+  const SECTION_INDEX_LOOKUP = useMemo(
+    () => modules.reduce((m, s, i) => { m[s.id] = i; return m }, {}),
+    [modules],
+  )
+
+  const SECTION_LOOKUP = useMemo(
+    () => modules.reduce((m, s) => { m[s.id] = s; return m }, {}),
+    [modules],
+  )
+
+  // Load modules from Firestore on mount + seed if needed
+  useEffect(() => {
+    if (!FIREBASE_READY) {
+      setModulesLoaded(true)
+      return
+    }
+
+    async function loadModules() {
+      try {
+        // Seed default modules if they don't exist
+        await seedModules(DEFAULT_SECTIONS)
+
+        // Fetch all modules from Firestore
+        const dbModules = await fetchModules()
+        if (dbModules.length > 0) {
+          setModules(dbModules)
+        }
+      } catch (err) {
+        console.warn('Failed to load modules from DB, using defaults:', err)
+      } finally {
+        setModulesLoaded(true)
+      }
+    }
+
+    loadModules()
+  }, [])
+
+  // When modules change, rebuild items if needed (only for fresh days)
+  useEffect(() => {
+    if (!modulesLoaded) return
+    // Only apply when there's no existing data
+    const cached = loadFromLocalStorage(currentDate)
+    if (!cached || cached.length === 0) {
+      setItems(createItemsFromModules(modules))
+    }
+  }, [modulesLoaded, modules, currentDate])
+
   // Persist items to localStorage on every change
   useEffect(() => {
     saveToLocalStorage(currentDate, items)
@@ -96,7 +159,7 @@ export function useChecklistStore() {
         console.warn('Auto-save failed for', item.id, err)
       }
     }, 600)
-  }, [])
+  }, [SECTION_INDEX_LOOKUP])
 
   // Load daily checklist from Firebase
   const loadDailyItems = useCallback(async (date) => {
@@ -106,7 +169,7 @@ export function useChecklistStore() {
       const remote = await fetchDailyItems(date)
       if (remote.length > 0) {
         // Merge with template to pick up any new template items
-        const template = createChecklistItems()
+        const template = createItemsFromModules(modules)
         const remoteMap = new Map(remote.map((i) => [i.id, i]))
         const merged = template.map((t) => remoteMap.has(t.id) ? { ...t, ...remoteMap.get(t.id) } : t)
         // Also include any custom items not in template
@@ -121,7 +184,7 @@ export function useChecklistStore() {
         if (cached && cached.length > 0) {
           setItems(cached)
         } else {
-          setItems(createChecklistItems())
+          setItems(createItemsFromModules(modules))
         }
       }
       setFirebaseState((s) => ({
@@ -140,7 +203,7 @@ export function useChecklistStore() {
         error: err?.message || 'Erreur de chargement.',
       }))
     }
-  }, [])
+  }, [modules])
 
   // Load available dates
   const loadDates = useCallback(async () => {
@@ -151,13 +214,14 @@ export function useChecklistStore() {
     } catch { /* ignore */ }
   }, [])
 
-  // Load on mount and when date changes
+  // Load on mount and when date changes (after modules are loaded)
   useEffect(() => {
+    if (!modulesLoaded) return
     if (FIREBASE_READY) {
       loadDailyItems(currentDate)
       loadDates()
     }
-  }, [currentDate, loadDailyItems, loadDates])
+  }, [currentDate, modulesLoaded, loadDailyItems, loadDates])
 
   // Sync all items to Firebase for current date
   const handleSync = useCallback(async () => {
@@ -186,7 +250,7 @@ export function useChecklistStore() {
         error: err?.message || 'Échec de la synchronisation.',
       }))
     }
-  }, [items, currentDate, loadDailyItems, loadDates])
+  }, [items, currentDate, SECTION_INDEX_LOOKUP, loadDailyItems, loadDates])
 
   const loadRemoteItems = useCallback(async () => {
     await loadDailyItems(currentDate)
@@ -231,7 +295,7 @@ export function useChecklistStore() {
     setItems((cur) => [...cur, newItem])
     saveItemToFirebase(newItem)
     return newItem
-  }, [items, saveItemToFirebase])
+  }, [items, SECTION_LOOKUP, saveItemToFirebase])
 
   // Delete item
   const deleteItem = useCallback(async (itemId) => {
@@ -303,7 +367,7 @@ export function useChecklistStore() {
 
   const sectionChartData = useMemo(
     () =>
-      CHECKLIST_SECTIONS.map((section) => {
+      modules.map((section) => {
         const sItems = items.filter((i) => i.sectionId === section.id)
         return {
           name: section.shortTitle,
@@ -315,7 +379,7 @@ export function useChecklistStore() {
           accent: section.accent,
         }
       }),
-    [items],
+    [items, modules],
   )
 
   const statusChartData = useMemo(
@@ -357,6 +421,10 @@ export function useChecklistStore() {
   )
 
   return {
+    // Dynamic modules from DB
+    modules,
+    modulesLoaded,
+
     items,
     currentDate,
     isToday,

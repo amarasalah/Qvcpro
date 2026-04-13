@@ -12,11 +12,17 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  PackageSearch,
   Search,
   Settings,
   Shield,
+  ShieldCheck,
+  ShoppingCart,
+  Sparkles,
   TestTube,
+  Truck,
   Users,
+  Wrench,
   X,
 } from 'lucide-react'
 import DashboardPage from './pages/DashboardPage'
@@ -26,22 +32,43 @@ import SettingsPage from './pages/SettingsPage'
 import LoginPage from './pages/LoginPage'
 import RolesPage from './pages/RolesPage'
 import UsersPage from './pages/UsersPage'
-import { CHECKLIST_SECTIONS } from './data/checklistTemplate'
 import { useChecklistStore } from './hooks/useChecklistStore'
 import { useAuth } from './contexts/AuthContext'
 import './App.css'
 
-const SECTION_ICONS = {
-  production: Factory,
-  'assurance-qualite': Shield,
-  'controle-qualite': TestTube,
+// Icon registry — maps icon names from DB to actual Lucide components
+const ICON_REGISTRY = {
+  Factory,
+  Shield,
+  TestTube,
+  PackageSearch,
+  Truck,
+  ShoppingCart,
+  Wrench,
+  Sparkles,
+  ShieldCheck,
+  ClipboardCheck,
+  LayoutDashboard,
+  BarChart3,
+  Settings,
+  Users,
 }
 
-// Map nav items to permission keys
-const SECTION_TO_PERM = {
+function getIconComponent(iconName) {
+  return ICON_REGISTRY[iconName] || ClipboardCheck
+}
+
+// Map module IDs to permission keys
+const MODULE_TO_PERM = {
   production: 'production',
   'assurance-qualite': 'assurance',
   'controle-qualite': 'controle',
+  logistique: 'logistique',
+  livraison: 'livraison',
+  achat: 'achat',
+  maintenance: 'maintenance',
+  entretien: 'entretien',
+  qhse: 'qhse',
 }
 
 export default function App() {
@@ -74,15 +101,15 @@ export default function App() {
     return <LoginPage />
   }
 
-  // Build nav items based on permissions
+  // Build nav items dynamically from DB-loaded modules
   const navItems = [
     hasPermission('dashboard') && { to: '/', icon: LayoutDashboard, label: 'Tableau de bord' },
-    ...CHECKLIST_SECTIONS.map((s) =>
-      hasPermission(SECTION_TO_PERM[s.id] || s.id) ? {
-        to: `/section/${s.id}`,
-        icon: SECTION_ICONS[s.id] || ClipboardCheck,
-        label: s.shortTitle,
-        accent: s.accent,
+    ...store.modules.map((mod) =>
+      hasPermission(MODULE_TO_PERM[mod.id] || mod.id) ? {
+        to: `/section/${mod.id}`,
+        icon: getIconComponent(mod.icon),
+        label: mod.shortTitle,
+        accent: mod.accent,
       } : null,
     ),
     hasPermission('stats') && { to: '/stats', icon: BarChart3, label: 'Statistiques' },
@@ -284,7 +311,7 @@ export default function App() {
           <AnimatePresence mode="wait">
             <Routes location={location} key={location.pathname}>
               <Route path="/" element={<DashboardPage store={store} />} />
-              {CHECKLIST_SECTIONS.map((section) => (
+              {store.modules.map((section) => (
                 <Route
                   key={section.id}
                   path={`/section/${section.id}`}

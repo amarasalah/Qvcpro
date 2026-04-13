@@ -4,16 +4,23 @@ import {
   Calendar,
   Camera,
   CheckCircle2,
+  ClipboardCheck,
   Edit3,
   Factory,
   ImageIcon,
   Loader2,
+  PackageSearch,
   Plus,
   Save,
   Search,
   Shield,
+  ShieldCheck,
+  ShoppingCart,
+  Sparkles,
   TestTube,
   Trash2,
+  Truck,
+  Wrench,
   X,
   ZoomIn,
 } from 'lucide-react'
@@ -21,10 +28,29 @@ import { uploadImage, isCloudinaryConfigured } from '../lib/cloudinary'
 import PrintButton from '../components/PrintButton'
 import ReportFilters from '../components/ReportFilters'
 
+const ICON_REGISTRY = {
+  Factory,
+  Shield,
+  TestTube,
+  PackageSearch,
+  Truck,
+  ShoppingCart,
+  Wrench,
+  Sparkles,
+  ShieldCheck,
+  ClipboardCheck,
+}
+
 const SECTION_ICONS = {
   production: Factory,
   'assurance-qualite': Shield,
   'controle-qualite': TestTube,
+  logistique: PackageSearch,
+  livraison: Truck,
+  achat: ShoppingCart,
+  maintenance: Wrench,
+  entretien: Sparkles,
+  qhse: ShieldCheck,
 }
 
 function formatDateTime(value) {
@@ -93,20 +119,21 @@ export default function SectionPage({ section, store }) {
             .toLowerCase()
             .includes(query)
         let matchDate = true
-        if (dateFrom && item.lastUpdated) {
-          const d = new Date(item.lastUpdated).toISOString().slice(0, 10)
-          if (d < dateFrom) matchDate = false
-        }
-        if (dateTo && item.lastUpdated) {
-          const d = new Date(item.lastUpdated).toISOString().slice(0, 10)
-          if (d > dateTo) matchDate = false
+        if (dateFrom || dateTo) {
+          if (!item.lastUpdated) {
+            matchDate = false
+          } else {
+            const d = new Date(item.lastUpdated).toISOString().slice(0, 10)
+            if (dateFrom && d < dateFrom) matchDate = false
+            if (dateTo && d > dateTo) matchDate = false
+          }
         }
         return matchStatus && matchQuery && matchDate
       }),
     [sectionItems, statusFilter, query, STATUS_META, dateFrom, dateTo],
   )
 
-  const Icon = SECTION_ICONS[section.id] || CheckCircle2
+  const Icon = SECTION_ICONS[section.id] || ICON_REGISTRY[section.icon] || CheckCircle2
 
   // Handlers
   const handleAddTask = () => {
@@ -170,7 +197,7 @@ export default function SectionPage({ section, store }) {
     >
       <div className="print-header">
         <h1>{section.title} — Checklist Qualité Béton Précontraint</h1>
-        <p>Imprimé le {new Intl.DateTimeFormat('fr-FR', { dateStyle: 'long', timeStyle: 'short' }).format(new Date())} — {sectionItems.length} points — Couverture {progress}%</p>
+        <p>Imprimé le {new Intl.DateTimeFormat('fr-FR', { dateStyle: 'long', timeStyle: 'short' }).format(new Date())} — Date de checklist : {new Date(currentDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })} — {filtered.length} points{filtered.length !== sectionItems.length ? ` (filtrés sur ${sectionItems.length})` : ''} — Couverture {progress}%</p>
       </div>
 
       {/* Hero */}
@@ -497,8 +524,8 @@ export default function SectionPage({ section, store }) {
                     placeholder="Observations terrain, contexte, mesure..."
                     value={item.comment}
                   />
-                  <span className={`print-text ${!item.comment.trim() ? 'is-empty' : ''}`}>
-                    {item.comment.trim() || 'Aucun commentaire'}
+                  <span className={`print-text ${!item.comment?.trim() ? 'is-empty' : ''}`}>
+                    {item.comment?.trim() || 'Aucun commentaire'}
                   </span>
                 </label>
 
@@ -509,8 +536,8 @@ export default function SectionPage({ section, store }) {
                     placeholder="Action corrective, responsable, délai..."
                     value={item.actionPlan}
                   />
-                  <span className={`print-text ${!item.actionPlan.trim() ? 'is-empty' : ''}`}>
-                    {item.actionPlan.trim() || 'Aucun plan d\'action'}
+                  <span className={`print-text ${!item.actionPlan?.trim() ? 'is-empty' : ''}`}>
+                    {item.actionPlan?.trim() || 'Aucun plan d\'action'}
                   </span>
                 </label>
               </motion.article>

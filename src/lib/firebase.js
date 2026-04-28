@@ -7,6 +7,7 @@ import {
   onAuthStateChanged,
 } from 'firebase/auth'
 import {
+  arrayUnion,
   collection,
   deleteDoc,
   doc,
@@ -16,6 +17,7 @@ import {
   query,
   serverTimestamp,
   setDoc,
+  updateDoc,
   writeBatch,
 } from 'firebase/firestore'
 
@@ -159,6 +161,19 @@ export async function saveModule(moduleId, data) {
 export async function deleteModule(moduleId) {
   if (!db) return
   await deleteDoc(doc(db, 'modules', moduleId))
+}
+
+/**
+ * Appends a new custom point to an existing module's items array.
+ * This makes the item part of the permanent template, visible on ALL dates.
+ */
+export async function addModuleItem(moduleId, pointText) {
+  if (!db) return false
+  await updateDoc(doc(db, 'modules', moduleId), {
+    items: arrayUnion(pointText),
+    updatedAt: serverTimestamp(),
+  })
+  return true
 }
 
 /**

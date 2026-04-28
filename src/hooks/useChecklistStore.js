@@ -4,6 +4,7 @@ import {
   createChecklistItems,
 } from '../data/checklistTemplate'
 import {
+  addModuleItem,
   deleteDailyItem,
   fetchDailyItems,
   fetchModules,
@@ -270,21 +271,41 @@ export function useChecklistStore() {
     })
   }, [saveItemToFirebase])
 
-  // Add new item — auto-saves to Firebase
-  const addItem = useCallback((sectionId, pointText) => {
+  // Add new item — persists to module template (visible on ALL dates) + saves as daily item
+  const addItem = useCallback(async (sectionId, pointText) => {
     const section = SECTION_LOOKUP[sectionId]
     if (!section || !pointText.trim()) return null
 
-    const sectionItems = items.filter((i) => i.sectionId === sectionId)
-    const nextNumber = String(sectionItems.length + 1)
-    const newId = `${sectionId}-${Date.now()}`
+    const trimmedPoint = pointText.trim()
+
+    // 1. Persist to the module template in Firestore so every date sees this task
+    if (FIREBASE_READY) {
+      try {
+        await addModuleItem(sectionId, trimmedPoint)
+        // Update local modules state so current session reflects immediately
+        setModules((prevModules) =>
+          prevModules.map((m) =>
+            m.id === sectionId
+              ? { ...m, items: [...(m.items || []), trimmedPoint] }
+              : m
+          )
+        )
+      } catch (err) {
+        console.warn('Could not persist task to module template:', err)
+      }
+    }
+
+    // 2. Build the item — count existing items for this section to compute next number
+    const sectionItemsCount = items.filter((i) => i.sectionId === sectionId).length
+    const nextIndex = sectionItemsCount + 1
+    const newId = `${sectionId}-${nextIndex}`
 
     const newItem = {
       id: newId,
       sectionId,
       sectionTitle: section.title,
-      number: nextNumber,
-      point: pointText.trim(),
+      number: String(nextIndex),
+      point: trimmedPoint,
       status: 'pending',
       comment: '',
       actionPlan: '',
@@ -292,7 +313,11 @@ export function useChecklistStore() {
       lastUpdated: Date.now(),
     }
 
-    setItems((cur) => [...cur, newItem])
+    setItems((cur) => {
+      // Avoid duplicate if a re-render already added via module reload
+      if (cur.find((i) => i.id === newId)) return cur
+      return [...cur, newItem]
+    })
     saveItemToFirebase(newItem)
     return newItem
   }, [items, SECTION_LOOKUP, saveItemToFirebase])

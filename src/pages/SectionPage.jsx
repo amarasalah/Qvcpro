@@ -136,9 +136,9 @@ export default function SectionPage({ section, store }) {
   const Icon = SECTION_ICONS[section.id] || ICON_REGISTRY[section.icon] || CheckCircle2
 
   // Handlers
-  const handleAddTask = () => {
+  const handleAddTask = async () => {
     if (!newPointText.trim()) return
-    addItem(section.id, newPointText)
+    await addItem(section.id, newPointText)
     setNewPointText('')
     setShowAddForm(false)
   }
